@@ -16,8 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ fun NavDrawer(
     onSearch: () -> Unit,
     onLibrary: (Int) -> Unit,
     onSettings: () -> Unit,
+    onFavorites: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -60,6 +62,7 @@ fun NavDrawer(
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
+        DrawerItem(Icons.Filled.Star, "Favorites", -3, selectedIndex, onFavorites)
         DrawerItem(Icons.Filled.Settings, "Settings", -2, selectedIndex, onSettings)
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()

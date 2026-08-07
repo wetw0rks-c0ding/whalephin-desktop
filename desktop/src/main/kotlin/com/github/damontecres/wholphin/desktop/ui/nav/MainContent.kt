@@ -65,6 +65,7 @@ fun MainContent(
             when (currentDestination) {
                 is Destination.Home -> 0
                 is Destination.Search -> 1
+                is Destination.Favorites -> 2
                 is Destination.MediaItem ->
                     librariesState
                         .indexOfFirst { it.id == currentDestination.itemId }
@@ -87,6 +88,7 @@ fun MainContent(
                         server = current?.server?.name.orEmpty(),
                         onHome = { navigationManager.goToHome() },
                         onSearch = { navigationManager.navigateToFromDrawer(Destination.Search()) },
+                        onFavorites = { navigationManager.navigateToFromDrawer(Destination.Favorites) },
                         onSettings = { navigationManager.navigateToFromDrawer(Destination.Settings) },
                         onLibrary = { index ->
                             val library = librariesState.getOrNull(index) ?: return@NavDrawer

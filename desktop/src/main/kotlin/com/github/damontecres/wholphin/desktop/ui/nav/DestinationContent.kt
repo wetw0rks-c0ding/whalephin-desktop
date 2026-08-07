@@ -18,7 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.CollectionFolderFilter
+import com.github.damontecres.wholphin.data.model.GetItemsFilter
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.desktop.services.HomeRowService
 import com.github.damontecres.wholphin.desktop.ui.detail.CollectionFolderScreen
@@ -26,6 +27,10 @@ import com.github.damontecres.wholphin.desktop.ui.detail.ItemDetailScreen
 import com.github.damontecres.wholphin.desktop.ui.main.HomePage
 import com.github.damontecres.wholphin.desktop.ui.main.SearchPage
 import com.github.damontecres.wholphin.desktop.ui.settings.SettingsPage
+import java.util.UUID
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.CollectionType
+import com.github.damontecres.wholphin.data.model.BaseItem
 import org.koin.compose.koinInject
 
 /**
@@ -92,6 +97,9 @@ fun DestinationContent(
 
                 is Destination.Settings ->
                     SettingsPage(onBack = onBack)
+
+                is Destination.Favorites ->
+                    FavoritesPage(onItemClick = onItemClick)
             }
         }
     }
@@ -103,6 +111,7 @@ private fun titleFor(destination: Destination): String =
         is Destination.MediaItem -> "Details"
         is Destination.MoreHomeRow -> destination.title
         is Destination.Settings -> "Settings"
+        is Destination.Favorites -> "Favorites"
         else -> ""
     }
 
@@ -136,4 +145,26 @@ private fun MoreHomeRowContent(
                 onItemClick = onItemClick,
             )
     }
+}
+
+/**
+ * Favorites page showing items the user has marked as favorite across all libraries.
+ */
+@Composable
+private fun FavoritesPage(
+    onItemClick: (BaseItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    CollectionFolderScreen(
+        itemId = UUID(0L, 0L),
+        collectionType = CollectionType.FOLDERS,
+        recursive = true,
+        filter =
+            CollectionFolderFilter(
+                filter = GetItemsFilter(favorite = true),
+                useSavedLibraryDisplayInfo = false,
+            ),
+        onItemClick = onItemClick,
+        modifier = modifier,
+    )
 }

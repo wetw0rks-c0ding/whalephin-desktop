@@ -1,22 +1,14 @@
 package com.github.damontecres.wholphin.desktop.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,10 +24,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.github.damontecres.wholphin.data.ExtrasItem
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.LocalTrailer
+import com.github.damontecres.wholphin.data.model.RemoteTrailer
+import com.github.damontecres.wholphin.data.model.Trailer
 import com.github.damontecres.wholphin.desktop.ui.components.LocalImageUrlService
 import com.github.damontecres.wholphin.desktop.util.DesktopViewModel
 import com.github.damontecres.wholphin.desktop.util.launchIO
+import com.github.damontecres.wholphin.services.ExtrasService
+import com.github.damontecres.wholphin.services.TrailerService
 import com.github.damontecres.wholphin.util.LoadingState
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,11 +50,15 @@ import org.koin.compose.koinInject
 data class ItemDetailState(
     val loadingState: LoadingState = LoadingState.Pending,
     val item: BaseItem? = null,
+    val trailers: List<Trailer> = emptyList(),
+    val extras: List<ExtrasItem> = emptyList(),
 )
 
 class ItemDetailViewModel(
     private val api: ApiClient,
     private val itemId: UUID,
+    private val trailerService: TrailerService,
+    private val extrasService: ExtrasService,
 ) : DesktopViewModel() {
     private val _state = MutableStateFlow(ItemDetailState())
     val state: StateFlow<ItemDetailState> = _state
@@ -66,8 +68,26 @@ class ItemDetailViewModel(
             _state.update { it.copy(loadingState = LoadingState.Loading) }
             try {
                 val dto = api.userLibraryApi.getItem(itemId = itemId).content
+                val item = dto?.let { BaseItem(it) }
+                val trailers =
+                    if (item != null) {
+                        trailerService.getRemoteTrailers(item) + trailerService.getLocalTrailers(item)
+                    } else {
+                        emptyList()
+                    }
+                val extras =
+                    if (item != null && (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.SERIES)) {
+                        extrasService.getExtras(itemId)
+                    } else {
+                        emptyList()
+                    }
                 _state.update {
-                    it.copy(loadingState = LoadingState.Success, item = dto?.let { BaseItem(it) })
+                    it.copy(
+                        loadingState = LoadingState.Success,
+                        item = item,
+                        trailers = trailers,
+                        extras = extras,
+                    )
                 }
             } catch (ex: Exception) {
                 _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
@@ -112,7 +132,9 @@ fun ItemDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val api = koinInject<ApiClient>()
-    val viewModel = remember(itemId) { ItemDetailViewModel(api, itemId) }
+    val trailerService = koinInject<TrailerService>()
+    val extrasService = koinInject<ExtrasService>()
+    val viewModel = remember(itemId) { ItemDetailViewModel(api, itemId, trailerService, extrasService) }
     DisposableEffect(viewModel) {
         onDispose { viewModel.clear() }
     }
@@ -197,7 +219,79 @@ fun ItemDetailScreen(
                             }
                         }
                     }
+                    // Trailers row
+                    val trailers = state.trailers
+                    if (trailers.isNotEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Trailers",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(trailers, key = { it.name }) { trailer ->
+                                TrailerCard(trailer = trailer, modifier = Modifier.width(240.dp))
+                            }
+                        }
+                    }
+                    // Extras row
+                    val extras = state.extras
+                    if (extras.isNotEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Extras",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(extras, key = { it.title }) { extra ->
+                                ExtraCard(extra = extra, modifier = Modifier.width(200.dp))
+                            }
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrailerCard(
+    trailer: Trailer,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(trailer.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            if (trailer is RemoteTrailer) {
+                trailer.subtitle?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExtraCard(
+    extra: ExtrasItem,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(extra.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            extra.subtitle?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

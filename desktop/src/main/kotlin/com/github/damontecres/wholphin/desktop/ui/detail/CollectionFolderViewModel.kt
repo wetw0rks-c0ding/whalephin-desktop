@@ -73,6 +73,10 @@ class CollectionFolderViewModel(
     }
 
     private suspend fun loadItem() {
+        if (itemId == UUID(0L, 0L)) {
+            _state.update { it.copy(item = null) }
+            return
+        }
         try {
             val item = api.userLibraryApi.getItem(itemId = itemId).content
             _state.update { it.copy(item = item?.let { BaseItem(it) }) }
@@ -91,11 +95,12 @@ class CollectionFolderViewModel(
         }
         try {
             val sort = _state.value.sortAndDirection
+            val parentId = itemId.takeIf { it != UUID(0L, 0L) }
             val request =
                 filter.applyTo(
                     GetItemsRequest(
                         userId = serverRepository.current.value?.user?.id,
-                        parentId = itemId,
+                        parentId = parentId,
                         recursive = recursive,
                         includeItemTypes = collectionType.baseItemKinds,
                         sortBy = listOfNotNull(sort.sort, ItemSortBy.SORT_NAME),
@@ -120,12 +125,14 @@ class CollectionFolderViewModel(
     }
 
     private fun loadSavedSort(): SortAndDirection {
+        if (itemId == UUID(0L, 0L)) return SortAndDirection.DEFAULT
         val serverId = serverRepository.current.value?.server?.id?.toString() ?: return SortAndDirection.DEFAULT
         val saved = libraryDisplayInfoStore.get(serverId, itemId.toString())
         return saved?.sortAndDirection ?: SortAndDirection.DEFAULT
     }
 
     private fun saveSort(sortAndDirection: SortAndDirection) {
+        if (itemId == UUID(0L, 0L)) return
         val serverId = serverRepository.current.value?.server?.id?.toString() ?: return
         libraryDisplayInfoStore.set(
             LibraryDisplayInfo(

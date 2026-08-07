@@ -18,9 +18,11 @@ import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.services.AppPaths
+import com.github.damontecres.wholphin.services.ExtrasService
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.JellyfinClientFactory
 import com.github.damontecres.wholphin.services.PreferenceStorage
+import com.github.damontecres.wholphin.services.TrailerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -281,4 +283,6 @@ val desktopModule = module {
     single { HomeRowService(serverRepository = get(), homeSettingsService = get()) }
     single { MpvEngine(engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())) }
     single { ItemPlaybackStore(File(get<AppPaths>().dataDir, "item-playback.json")) }
+    single { TrailerService(api = get()) }
+    single { ExtrasService(api = get(), imageUrlService = get()) }
 }
