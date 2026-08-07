@@ -32,7 +32,8 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.compose)
 
-    implementation(libs.datastore.preferences.core)
+    implementation(libs.androidx.datastore.core)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
 

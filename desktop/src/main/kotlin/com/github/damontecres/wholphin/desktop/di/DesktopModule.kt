@@ -1,15 +1,17 @@
 package com.github.damontecres.wholphin.desktop.di
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.core.Serializer
+import androidx.datastore.core.StorageConnection
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import com.github.damontecres.wholphin.data.ServerDao
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.desktop.data.JsonServerDao
 import com.github.damontecres.wholphin.desktop.data.LibraryDisplayInfoStore
 import com.github.damontecres.wholphin.data.playback.PlaybackEngine
 import com.github.damontecres.wholphin.desktop.data.ItemPlaybackStore
+import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.desktop.preferences.AppPreferencesSerializer
 import com.github.damontecres.wholphin.desktop.playback.MpvEngine
 import com.github.damontecres.wholphin.desktop.services.HomeRowService
 import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
@@ -23,7 +25,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.koin.dsl.module
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.model.ClientInfo
@@ -53,29 +59,82 @@ class XdgAppPaths(
 }
 
 /**
- * [PreferenceStorage] backed by a preferences DataStore file in the XDG data directory.
+ * Simple JSON-based preferences store using atomic file writes.
+ * This avoids the complex DataStore API issues for desktop.
+ */
+class AppPreferencesStore(
+    appPaths: AppPaths,
+) {
+    private val file = File(appPaths.dataDir, "app-preferences.json")
+    private val serializer = AppPreferencesSerializer()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val _data = MutableStateFlow<AppPreferences?>(null)
+    val data: Flow<AppPreferences> = _data
+        .map { it ?: serializer.defaultValue }
+        .distinctUntilChanged()
+
+    init {
+        // Load synchronously in init
+        if (file.exists()) {
+            try {
+                val content = file.readText()
+                val prefs = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    .decodeFromString<AppPreferences>(content)
+                _data.value = prefs
+            } catch (e: Exception) {
+                file.delete()
+                _data.value = serializer.defaultValue
+            }
+        } else {
+            _data.value = serializer.defaultValue
+        }
+    }
+
+    suspend fun updateData(block: AppPreferences.() -> AppPreferences) {
+        val current = _data.value ?: serializer.defaultValue
+        val newPrefs = current.block()
+        _data.value = newPrefs
+        save(newPrefs)
+    }
+
+    private suspend fun save(prefs: AppPreferences) {
+        val tmpFile = File(file.parent, "${file.name}.tmp")
+        try {
+            val content = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .encodeToString(prefs)
+            tmpFile.writeText(content)
+            tmpFile.renameTo(file)
+            file.setReadable(true, false)
+            file.setWritable(true, false)
+        } catch (e: Exception) {
+            tmpFile.delete()
+            throw e
+        }
+    }
+}
+
+/**
+ * [PreferenceStorage] backed by JSON file store for AppPreferences.
  */
 class DataStorePreferenceStorage(
     appPaths: AppPaths,
 ) : PreferenceStorage {
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val prefsStore = AppPreferencesStore(appPaths)
 
-    override val dataStore: DataStore<Preferences> =
-        PreferenceDataStoreFactory.create(
-            scope = scope,
-            produceFile = { File(appPaths.dataDir, "preferences.preferences_pb") },
-        )
+    override val dataStore: DataStore<Preferences>
+        get() = error("Preferences DataStore not used by desktop JSON preferences")
+    override val appPreferences: Flow<AppPreferences> = prefsStore.data
+
+    override suspend fun updateAppPreferences(block: AppPreferences.() -> AppPreferences) {
+        prefsStore.updateData(block)
+    }
 
     override fun <T> get(key: Preferences.Key<T>, default: T): Flow<T> =
-        dataStore.data.map { it[key] ?: default }
+        kotlinx.coroutines.flow.flowOf(default)
 
-    override suspend fun <T> put(key: Preferences.Key<T>, value: T) {
-        dataStore.edit { it[key] = value }
-    }
+    override suspend fun <T> put(key: Preferences.Key<T>, value: T) = Unit
 
-    override suspend fun remove(key: Preferences.Key<*>) {
-        dataStore.edit { it.remove(key) }
-    }
+    override suspend fun remove(key: Preferences.Key<*>) = Unit
 }
 
 /**

@@ -58,4 +58,7 @@ sealed class Destination(
         val type: BaseItemKind,
         val positionMs: Long = 0,
     ) : Destination(fullScreen = true)
+
+    @Serializable
+    data object Settings : Destination()
 }

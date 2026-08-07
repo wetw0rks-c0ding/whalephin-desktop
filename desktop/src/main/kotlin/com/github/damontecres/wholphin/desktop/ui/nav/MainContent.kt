@@ -87,6 +87,7 @@ fun MainContent(
                         server = current?.server?.name.orEmpty(),
                         onHome = { navigationManager.goToHome() },
                         onSearch = { navigationManager.navigateToFromDrawer(Destination.Search()) },
+                        onSettings = { navigationManager.navigateToFromDrawer(Destination.Settings) },
                         onLibrary = { index ->
                             val library = librariesState.getOrNull(index) ?: return@NavDrawer
                             navigationManager.navigateToFromDrawer(

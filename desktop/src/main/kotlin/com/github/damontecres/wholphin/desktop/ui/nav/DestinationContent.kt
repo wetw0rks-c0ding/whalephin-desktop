@@ -25,6 +25,7 @@ import com.github.damontecres.wholphin.desktop.ui.detail.CollectionFolderScreen
 import com.github.damontecres.wholphin.desktop.ui.detail.ItemDetailScreen
 import com.github.damontecres.wholphin.desktop.ui.main.HomePage
 import com.github.damontecres.wholphin.desktop.ui.main.SearchPage
+import com.github.damontecres.wholphin.desktop.ui.settings.SettingsPage
 import org.koin.compose.koinInject
 
 /**
@@ -88,6 +89,9 @@ fun DestinationContent(
                         initialPositionMs = destination.positionMs,
                         onItemClick = onItemClick,
                     )
+
+                is Destination.Settings ->
+                    SettingsPage(onBack = onBack)
             }
         }
     }
@@ -98,6 +102,7 @@ private fun titleFor(destination: Destination): String =
         is Destination.FilteredCollection -> "Library"
         is Destination.MediaItem -> "Details"
         is Destination.MoreHomeRow -> destination.title
+        is Destination.Settings -> "Settings"
         else -> ""
     }
 

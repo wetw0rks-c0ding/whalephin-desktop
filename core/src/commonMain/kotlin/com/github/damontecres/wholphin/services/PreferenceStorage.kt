@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.services
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.github.damontecres.wholphin.preferences.AppPreferences
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -21,4 +22,10 @@ interface PreferenceStorage {
 
     /** Removes [key] if present. */
     suspend fun remove(key: Preferences.Key<*>)
+
+    /** Emits the full AppPreferences object. */
+    val appPreferences: Flow<AppPreferences>
+
+    /** Atomically updates the AppPreferences. */
+    suspend fun updateAppPreferences(block: AppPreferences.() -> AppPreferences)
 }
