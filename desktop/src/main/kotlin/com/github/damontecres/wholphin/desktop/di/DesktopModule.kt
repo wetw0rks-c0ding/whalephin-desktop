@@ -8,6 +8,8 @@ import com.github.damontecres.wholphin.data.ServerDao
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.desktop.data.JsonServerDao
 import com.github.damontecres.wholphin.desktop.data.LibraryDisplayInfoStore
+import com.github.damontecres.wholphin.desktop.services.HomeRowService
+import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.services.AppPaths
@@ -118,4 +120,6 @@ val desktopModule = module {
     single { NavigationManager() }
     single { LibraryDisplayInfoStore(File(get<AppPaths>().dataDir, "library-display-info.json")) }
     single { ImageUrlService(api = get()) }
+    single { HomeSettingsService(api = get()) }
+    single { HomeRowService(serverRepository = get(), homeSettingsService = get()) }
 }
