@@ -39,6 +39,7 @@ class HomeViewModel(
     val state: StateFlow<HomeState> = _state
 
     private var initialised by mutableStateOf(false)
+    private var loadGeneration = 0
 
     fun init() {
         if (initialised) return
@@ -53,12 +54,21 @@ class HomeViewModel(
 
     private suspend fun load() {
         val user = serverRepository.current.value?.user ?: return
-        _state.update { it.copy(loadingState = LoadingState.Loading) }
+        val generation = ++loadGeneration
+        _state.update { it.copy(loadingState = LoadingState.Loading, homeRows = emptyList()) }
         try {
             val (rows, names) = homeSettingsService.getHomeRows(user.id)
-            _state.update { it.copy(loadingState = LoadingState.Success, libraryNames = names) }
-            rows.forEach { row ->
-                viewModelScope.launch { fetchRow(user.id, row) }
+            _state.update {
+                it.copy(
+                    loadingState = LoadingState.Success,
+                    libraryNames = names,
+                    // Pre-seed one slot per row so each row has a stable identity while
+                    // its contents load independently.
+                    homeRows = rows.map { row -> HomeRowLoadingState.Pending(rowTitle(row)) },
+                )
+            }
+            rows.forEachIndexed { index, row ->
+                viewModelScope.launch { fetchRow(user.id, row, index, generation) }
             }
         } catch (ex: Exception) {
             _state.update {
@@ -73,43 +83,39 @@ class HomeViewModel(
     private suspend fun fetchRow(
         userId: UUID,
         row: HomeRowConfig,
+        index: Int,
+        generation: Int,
     ) {
+        if (generation != loadGeneration) return
         val title = rowTitle(row)
         _state.update { state ->
-            state.copy(homeRows = state.homeRows + HomeRowLoadingState.Loading(title))
+            if (generation != loadGeneration) return@update state
+            val rows = state.homeRows.toMutableList()
+            if (index < rows.size) rows[index] = HomeRowLoadingState.Loading(title)
+            state.copy(homeRows = rows)
         }
         try {
             val items = homeSettingsService.fetchRow(userId, row)
             _state.update { state ->
-                val rows =
-                    state.homeRows.map { rowState ->
-                        if (rowState is HomeRowLoadingState.Loading && rowState.title == title) {
-                            HomeRowLoadingState.Success(
-                                title = title,
-                                items = items,
-                                viewOptions = row.viewOptions,
-                                rowType = row,
-                                showViewMore = items.size >= ROW_LIMIT,
-                            )
-                        } else {
-                            rowState
-                        }
-                    }
-                state.copy(
-                    homeRows = rows,
-                    refreshState = LoadingState.Success,
-                )
+                if (generation != loadGeneration) return@update state
+                val rows = state.homeRows.toMutableList()
+                if (index < rows.size) {
+                    rows[index] =
+                        HomeRowLoadingState.Success(
+                            title = title,
+                            items = items,
+                            viewOptions = row.viewOptions,
+                            rowType = row,
+                            showViewMore = items.size >= ROW_LIMIT,
+                        )
+                }
+                state.copy(homeRows = rows, refreshState = LoadingState.Success)
             }
         } catch (ex: Exception) {
             _state.update { state ->
-                val rows =
-                    state.homeRows.map { rowState ->
-                        if (rowState is HomeRowLoadingState.Loading && rowState.title == title) {
-                            HomeRowLoadingState.Error(title = title, message = ex.localizedMessage, exception = ex)
-                        } else {
-                            rowState
-                        }
-                    }
+                if (generation != loadGeneration) return@update state
+                val rows = state.homeRows.toMutableList()
+                if (index < rows.size) rows[index] = HomeRowLoadingState.Error(title = title, message = ex.localizedMessage, exception = ex)
                 state.copy(homeRows = rows)
             }
         }

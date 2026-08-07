@@ -52,20 +52,24 @@ class CollectionFolderViewModel(
     private val _state = MutableStateFlow(CollectionFolderState.EMPTY)
     val state: StateFlow<CollectionFolderState> = _state
 
+    private var loadGeneration = 0
+
     fun init() {
         val filter = collectionFilter.filter
         val savedSort = loadSavedSort()
         _state.update { it.copy(sortAndDirection = savedSort) }
+        val generation = ++loadGeneration
         viewModelScope.launchIO {
             loadItem()
-            loadItems(filter)
+            loadItems(filter, generation)
         }
     }
 
     fun onSortChange(sortAndDirection: SortAndDirection) {
+        val generation = ++loadGeneration
         _state.update { it.copy(sortAndDirection = sortAndDirection) }
         saveSort(sortAndDirection)
-        viewModelScope.launchIO { loadItems(collectionFilter.filter) }
+        viewModelScope.launchIO { loadItems(collectionFilter.filter, generation) }
     }
 
     private suspend fun loadItem() {
@@ -77,8 +81,14 @@ class CollectionFolderViewModel(
         }
     }
 
-    private suspend fun loadItems(filter: com.github.damontecres.wholphin.data.model.GetItemsFilter) {
-        _state.update { it.copy(loadingState = LoadingState.Loading) }
+    private suspend fun loadItems(
+        filter: com.github.damontecres.wholphin.data.model.GetItemsFilter,
+        generation: Int,
+    ) {
+        _state.update { state ->
+            if (generation != loadGeneration) return@update state
+            state.copy(loadingState = LoadingState.Loading)
+        }
         try {
             val sort = _state.value.sortAndDirection
             val request =
@@ -96,12 +106,16 @@ class CollectionFolderViewModel(
                     ),
                 )
             val result = api.itemsApi.getItems(request).content.items
-            _state.update {
-                it.copy(loadingState = LoadingState.Success, items = result.map { item -> BaseItem(item) })
+            _state.update { state ->
+                if (generation != loadGeneration) return@update state
+                state.copy(loadingState = LoadingState.Success, items = result.map { BaseItem(it) })
             }
         } catch (ex: Exception) {
             Log.e(ex, "Error loading collection items for $itemId")
-            _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
+            _state.update { state ->
+                if (generation != loadGeneration) return@update state
+                state.copy(loadingState = LoadingState.Error(exception = ex))
+            }
         }
     }
 

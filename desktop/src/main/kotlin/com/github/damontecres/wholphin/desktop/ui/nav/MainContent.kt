@@ -28,6 +28,7 @@ import com.github.damontecres.wholphin.desktop.services.NavigationManager
 import com.github.damontecres.wholphin.desktop.ui.components.LocalImageUrlService
 import com.github.damontecres.wholphin.desktop.util.launchDefault
 import com.github.damontecres.wholphin.services.ImageUrlService
+import com.github.damontecres.wholphin.util.Log
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -53,11 +54,26 @@ fun MainContent(
         val user = current?.user ?: return@LaunchedEffect
         runCatching { homeSettingsService.getLibraries(user.id) }
             .onSuccess { librariesState = it }
+            .onFailure { Log.e(it, "Failed to load libraries for ${user.id}") }
     }
 
-    var selectedIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(navigationManager.backStack.lastOrNull()) {
-        selectedIndex = 0
+    // Highlight the drawer entry matching the current destination.
+    val currentDestination = navigationManager.backStack.lastOrNull()
+    var selectedIndex by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(currentDestination) {
+        selectedIndex =
+            when (currentDestination) {
+                is Destination.Home -> 0
+                is Destination.Search -> 1
+                is Destination.MediaItem ->
+                    librariesState
+                        .indexOfFirst { it.id == currentDestination.itemId }
+                        .takeIf { it >= 0 }
+                        ?.plus(2)
+                        ?: -1
+
+                else -> -1
+            }
     }
 
     CompositionLocalProvider(LocalImageUrlService provides imageUrlService) {

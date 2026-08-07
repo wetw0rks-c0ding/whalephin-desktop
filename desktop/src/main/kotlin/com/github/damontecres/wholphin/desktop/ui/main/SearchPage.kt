@@ -68,8 +68,21 @@ fun SearchPage(
                 items(SearchType.entries) { type ->
                     val result = state.results[type]
                     when (result) {
-                        null, is DataLoadingState.Pending, is DataLoadingState.Loading -> Unit
-                        is DataLoadingState.Error -> Unit
+                        null, is DataLoadingState.Pending -> Unit
+                        is DataLoadingState.Loading ->
+                            Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+
+                        is DataLoadingState.Error ->
+                            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "${type.label} search failed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+
                         is DataLoadingState.Success -> {
                             if (result.data.isNotEmpty()) {
                                 MediaRow(

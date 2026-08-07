@@ -45,21 +45,27 @@ class SearchViewModel(
     private val _state = MutableStateFlow(SearchState.EMPTY)
     val state: StateFlow<SearchState> = _state
 
+    private var searchGeneration = 0
+
     fun search(query: String) {
+        val generation = ++searchGeneration
         if (query.isBlank()) {
             _state.update { SearchState.EMPTY }
             return
         }
-        _state.update { it.copy(query = query) }
-        val results = _state.value.results
+        _state.update {
+            it.copy(
+                query = query,
+                // Reset every result to Loading for the new query so stale results
+                // from the previous query are never shown.
+                results = SearchType.entries.associateWith { DataLoadingState.Loading },
+            )
+        }
         SearchType.entries.forEach { type ->
-            if (results[type] == null) {
-                _state.update { state -> state.copy(results = state.results + (type to DataLoadingState.Loading)) }
-            }
             viewModelScope.launchIO {
-                val result =
-                    runCatching { fetch(type, query) }
+                val result = runCatching { fetch(type, query) }
                 _state.update { state ->
+                    if (generation != searchGeneration) return@update state
                     state.copy(results = state.results + (type to DataLoadingState.of(result)))
                 }
             }

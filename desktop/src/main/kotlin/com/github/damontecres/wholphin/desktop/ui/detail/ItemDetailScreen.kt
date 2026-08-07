@@ -117,7 +117,7 @@ fun ItemDetailScreen(
         onDispose { viewModel.clear() }
     }
     val state by viewModel.state.collectAsState()
-    LaunchedEffect(Unit) { viewModel.init() }
+    LaunchedEffect(viewModel) { viewModel.init() }
     val imageUrlService = LocalImageUrlService.current
 
     when (val loading = state.loadingState) {
@@ -177,7 +177,7 @@ fun ItemDetailScreen(
                                 text =
                                     listOfNotNull(
                                         item.data.productionYear?.toString(),
-                                        item.data.runTimeTicks?.let { "${it / 60_000_000L} min" },
+                                        item.data.runTimeTicks?.let { "${it / 600_000_000L} min" },
                                     ).plus(item.data.genres.orEmpty().take(3)).joinToString(" • "),
                                 style = MaterialTheme.typography.bodyMedium,
                             )

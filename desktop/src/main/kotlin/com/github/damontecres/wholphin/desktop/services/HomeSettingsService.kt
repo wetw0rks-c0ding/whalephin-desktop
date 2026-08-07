@@ -56,21 +56,14 @@ class HomeSettingsService(
     /**
      * The user's libraries (top-level user views), used by the nav drawer.
      */
-    suspend fun getLibraries(userId: UUID): List<Library> {
-        val views =
-            try {
-                api.userViewsApi.getUserViews(userId = userId).content.items
-            } catch (ex: Exception) {
-                emptyList()
-            }
-        return views.map { view ->
+    suspend fun getLibraries(userId: UUID): List<Library> =
+        api.userViewsApi.getUserViews(userId = userId).content.items.map { view ->
             Library(
                 id = view.id,
                 name = view.name ?: "Library",
                 collectionType = view.collectionType,
             )
         }
-    }
 
     suspend fun fetchRow(
         userId: UUID,

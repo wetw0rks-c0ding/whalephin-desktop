@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +58,7 @@ fun CollectionFolderScreen(
 ) {
     val viewModel = rememberCollectionFolderViewModel(itemId, collectionType, recursive, filter)
     val state by viewModel.state.collectAsState()
-    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.init() }
+    LaunchedEffect(viewModel) { viewModel.init() }
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -148,7 +149,7 @@ fun rememberCollectionFolderViewModel(
     val serverRepository = koinInject<ServerRepository>()
     val libraryDisplayInfoStore = koinInject<LibraryDisplayInfoStore>()
     val vm =
-        remember(itemId) {
+        remember(itemId, collectionType, recursive, filter) {
             CollectionFolderViewModel(
                 api = api,
                 serverRepository = serverRepository,
