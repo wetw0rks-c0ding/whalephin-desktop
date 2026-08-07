@@ -18,9 +18,12 @@ import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.services.AppPaths
+import com.github.damontecres.wholphin.services.BackgroundTaskScheduler
+import com.github.damontecres.wholphin.services.DisplayPreferencesService
 import com.github.damontecres.wholphin.services.ExtrasService
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.JellyfinClientFactory
+import com.github.damontecres.wholphin.services.LatestNextUpService
 import com.github.damontecres.wholphin.services.PreferenceStorage
 import com.github.damontecres.wholphin.services.TrailerService
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +39,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import org.koin.dsl.module
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.model.ClientInfo
@@ -290,4 +295,22 @@ val desktopModule = module {
     single { ItemPlaybackStore(File(get<AppPaths>().dataDir, "item-playback.json")) }
     single { TrailerService(api = get()) }
     single { ExtrasService(api = get(), imageUrlService = get()) }
+    single { DisplayPreferencesService(api = get()) }
+    single { LatestNextUpService(api = get(), displayPreferencesService = get()) }
+    // Background task schedulers
+    single {
+        val scope: CoroutineScope = get()
+        val serverRepo = get<ServerRepository>()
+        val service = get<LatestNextUpService>()
+        BackgroundTaskScheduler(
+            scope = scope,
+            interval = 4.hours,
+            initialDelay = 5.minutes,
+            shouldRun = { serverRepo.current.value?.server != null },
+            task = {
+                val userId = serverRepo.current.value?.user?.id ?: return@BackgroundTaskScheduler
+                service.updateRemovedFromNextUp(userId)
+            },
+        ).also { it.start() }
+    }
 }
