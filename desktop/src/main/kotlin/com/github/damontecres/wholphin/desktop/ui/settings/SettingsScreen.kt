@@ -12,13 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.github.damontecres.wholphin.desktop.di.PreferenceWriter
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.services.PreferenceStorage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,37 +23,22 @@ fun SettingsPage(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     preferenceStorage: PreferenceStorage = koinInject(),
-    appScope: CoroutineScope = koinInject(),
+    preferenceWriter: PreferenceWriter = koinInject(),
 ) {
-    // Persisted state emits asynchronously; replace defaults once loaded unless the
-    // user has an edit still pending, in which case keep the local value.
+    // Persisted state emits asynchronously; replace defaults once loaded.
     val storedPrefs by preferenceStorage.appPreferences.collectAsState(initial = AppPreferences())
     var appPrefs by remember { mutableStateOf(storedPrefs) }
     var selectedSection by remember { mutableIntStateOf(0) }
 
-    // A queue of pending writes drained on the app-scoped scope, so debounced
-    // persistence survives navigating away from this screen.
-    val pendingWrites = remember {
-        MutableSharedFlow<AppPreferences.() -> AppPreferences>(extraBufferCapacity = 64)
-    }
-    LaunchedEffect(appScope, pendingWrites) {
-        pendingWrites.collectLatest { task ->
-            delay(400)
-            preferenceStorage.updateAppPreferences {
-                with(copy()) { task() }
-            }
-        }
-    }
-
     fun updatePrefs(task: AppPreferences.() -> AppPreferences) {
+        // Update the local snapshot for immediate UI feedback; the writer owns
+        // debounced persistence and survives navigation away from this screen.
         appPrefs = task(appPrefs.copy())
-        pendingWrites.tryEmit(task)
+        preferenceWriter.enqueue(task)
     }
 
     // Sync asynchronously-loaded persisted values back into local state,
-    // replacing the initial default once the store has actually emitted.
-    // Edits made here are written to the same store, so the echo is a no-op
-    // (equal values) and never clobbers in-progress changes.
+    // replacing the default once the store has actually emitted.
     LaunchedEffect(storedPrefs) {
         appPrefs = storedPrefs
     }

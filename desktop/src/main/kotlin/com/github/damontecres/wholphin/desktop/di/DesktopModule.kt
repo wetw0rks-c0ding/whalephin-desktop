@@ -27,8 +27,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -152,6 +154,39 @@ class DataStorePreferenceStorage(
 }
 
 /**
+ * Application-scoped writer that collects preference edits from the UI and
+ * persists a single atomic snapshot after a debounce interval.
+ *
+ * Owns its collector on the app [CoroutineScope] so queued edits complete even
+ * after the settings screen leaves composition. Debouncing via [collectLatest]
+ * means a rapid burst of edits collapses into one write; the final task is
+ * always applied, so no discrete change is permanently lost.
+ */
+class PreferenceWriter(
+    private val preferenceStorage: PreferenceStorage,
+    scope: CoroutineScope,
+) {
+    private val pending = MutableStateFlow<(AppPreferences) -> AppPreferences>({ it })
+
+    init {
+        scope.launch {
+            pending.collectLatest { task ->
+                delay(400)
+                // Apply the latest (composed) task atomically against persisted state.
+                preferenceStorage.updateAppPreferences {
+                    task(copy())
+                }
+            }
+        }
+    }
+
+    /** Queues [task] to be applied to the preferences and persisted. */
+    fun enqueue(task: AppPreferences.() -> AppPreferences) {
+        pending.value = { prefs -> prefs.task() }
+    }
+}
+
+/**
  * A [DeviceInfo] identifying this app instance to Jellyfin servers.
  * Desktop equivalent of `androidDevice(context)`. The device id is persisted so the
  * server sees a stable device identity across app restarts.
@@ -177,6 +212,7 @@ val desktopModule = module {
     single<AppPaths> { XdgAppPaths() }
     single { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     single<PreferenceStorage> { DataStorePreferenceStorage(get()) }
+    single { PreferenceWriter(preferenceStorage = get(), scope = get()) }
     single {
         JellyfinClientFactory(
             clientInfo = ClientInfo(name = "Wholphin Desktop", version = "0.0.0-dev"),
