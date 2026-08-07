@@ -158,31 +158,67 @@ class DataStorePreferenceStorage(
  * persists a single atomic snapshot after a debounce interval.
  *
  * Owns its collector on the app [CoroutineScope] so queued edits complete even
- * after the settings screen leaves composition. Debouncing via [collectLatest]
- * means a rapid burst of edits collapses into one write; the final task is
- * always applied, so no discrete change is permanently lost.
+ * after the settings screen leaves composition. Edits arriving within the
+ * debounce window are composed so changes to different fields all survive.
+ * Persistence failures are retried with bounded backoff without stopping the
+ * collector, so later edits are still processed.
  */
 class PreferenceWriter(
     private val preferenceStorage: PreferenceStorage,
     scope: CoroutineScope,
 ) {
-    private val pending = MutableStateFlow<(AppPreferences) -> AppPreferences>({ it })
+    @Volatile
+    private var composedBatch: (AppPreferences) -> AppPreferences = { it }
 
     init {
         scope.launch {
-            pending.collectLatest { task ->
+            // Debounce loop: wait for a quiet window, then flush the accumulated
+            // (composed) edits as one atomic write, retrying transient failures.
+            while (true) {
                 delay(400)
-                // Apply the latest (composed) task atomically against persisted state.
+                val batch = composedBatch
+                composedBatch = { it }
+                if (batch === IDLE) continue
+                persistWithRetry(batch)
+            }
+        }
+    }
+
+    private suspend fun persistWithRetry(batch: (AppPreferences) -> AppPreferences) {
+        var attempt = 0
+        while (true) {
+            try {
                 preferenceStorage.updateAppPreferences {
-                    task(copy())
+                    batch(copy())
                 }
+                return
+            } catch (_: Exception) {
+                attempt++
+                if (attempt >= MAX_WRITE_ATTEMPTS) return
+                delay(RETRY_DELAY_MS * attempt)
             }
         }
     }
 
     /** Queues [task] to be applied to the preferences and persisted. */
     fun enqueue(task: AppPreferences.() -> AppPreferences) {
-        pending.value = { prefs -> prefs.task() }
+        // Compose so edits from the same debounce window to different fields
+        // are all applied, not overwritten.
+        synchronized(this) {
+            composedBatch = compose(composedBatch, task)
+        }
+    }
+
+    private companion object {
+        val IDLE: (AppPreferences) -> AppPreferences = { it }
+        // Chain the existing batch, then apply the new edit on its result.
+        fun compose(
+            existing: (AppPreferences) -> AppPreferences,
+            next: AppPreferences.() -> AppPreferences,
+        ): (AppPreferences) -> AppPreferences = { prefs -> next(existing(prefs)) }
+
+        const val MAX_WRITE_ATTEMPTS = 3
+        const val RETRY_DELAY_MS = 250L
     }
 }
 
