@@ -224,7 +224,7 @@ class ServerRepository(
     }
 
     suspend fun removeUser(user: JellyfinUser) {
-        if (current.value?.user?.id == user.id) {
+        if (current.value?.user?.id == user.id && current.value?.server?.id == user.serverId) {
             withContext(WholphinDispatchers.Main) {
                 _current.value = null
             }
@@ -261,7 +261,7 @@ class ServerRepository(
         requireLogin: Boolean,
     ) {
         val newUser = user.copy(pin = pin, requireLogin = requireLogin)
-        val updatedUser = serverDao.addOrUpdateUser(newUser)
+        val updatedUser = withContext(ioDispatcher) { serverDao.addOrUpdateUser(newUser) }
         val cur = current.value
         if (cur?.user?.id == updatedUser.id && cur.server?.id == user.serverId) {
             // Updating current user, so push out the change

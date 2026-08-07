@@ -8,8 +8,6 @@ import com.github.damontecres.wholphin.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -32,7 +30,8 @@ class JsonServerDao(
         val users: List<JellyfinUser> = emptyList(),
     )
 
-    private val mutex = Mutex()
+    /** Guards read-modify-write transitions; the DAO interface is non-suspend so [synchronized] is used. */
+    private val lock = Any()
 
     private val _fileState = MutableStateFlow(load())
     private val fileState: Flow<ServersFile> = _fileState
@@ -42,7 +41,9 @@ class JsonServerDao(
         return try {
             Json { ignoreUnknownKeys = true }.decodeFromString<ServersFile>(file.readText())
         } catch (ex: Exception) {
-            Log.e(ex, "Error loading ${file.path}, starting fresh")
+            // Preserve the corrupt file for inspection instead of silently overwriting it on save
+            Log.e(ex, "Error loading ${file.path}; preserving file and starting fresh")
+            file.renameTo(File(file.parentFile, file.name + ".bak"))
             ServersFile()
         }
     }
@@ -51,10 +52,25 @@ class JsonServerDao(
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
         tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
+        setOwnerOnly(tmp)
         if (!tmp.renameTo(file)) {
+            // Rename failed: keep a backup of the old file, then copy the tmp content over
+            if (file.exists()) {
+                file.renameTo(File(file.parentFile, file.name + ".bak"))
+            }
             file.writeText(tmp.readText())
             tmp.delete()
         }
+        setOwnerOnly(file)
+    }
+
+    /** Restricts a file to owner read/write (0600) since it contains access tokens */
+    private fun setOwnerOnly(file: File) {
+        file.setReadable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(false, false)
+        file.setWritable(true, true)
+        file.setExecutable(false, false)
     }
 
     override fun addOrUpdateServer(server: JellyfinServer) {
@@ -69,31 +85,31 @@ class JsonServerDao(
         }
     }
 
-    override fun addOrUpdateUser(user: JellyfinUser): JellyfinUser {
-        val existing = getUser(user.serverId, user.id)
-        val updated =
-            if (existing != null) {
-                user.copy(rowId = existing.rowId)
-            } else {
-                val rowId = _fileState.value.users.maxOfOrNull { it.rowId }?.plus(1) ?: 1
-                user.copy(rowId = rowId)
-            }
-        updateValue { data ->
-            val users =
-                if (data.users.any { it.id == updated.id && it.serverId == updated.serverId }) {
-                    data.users.map { if (it.id == updated.id && it.serverId == updated.serverId) updated else it }
+    override fun addOrUpdateUser(user: JellyfinUser): JellyfinUser =
+        synchronized(lock) {
+            val current = _fileState.value
+            val existing = current.users.firstOrNull { it.serverId == user.serverId && it.id == user.id }
+            val updated =
+                if (existing != null) {
+                    user.copy(rowId = existing.rowId)
                 } else {
-                    data.users + updated
+                    user.copy(rowId = current.users.maxOfOrNull { it.rowId }?.plus(1) ?: 1)
                 }
-            data.copy(users = users)
+            val users =
+                if (existing != null) {
+                    current.users.map { if (it.serverId == updated.serverId && it.id == updated.id) updated else it }
+                } else {
+                    current.users + updated
+                }
+            _fileState.value = current.copy(users = users)
+            save(_fileState.value)
+            updated
         }
-        return updated
-    }
 
     override fun getUser(
         serverId: UUID,
         userId: UUID,
-    ): JellyfinUser? = _fileState.value.users.firstOrNull { it.serverId == serverId && it.id == userId }
+    ): JellyfinUser? = synchronized(lock) { _fileState.value.users.firstOrNull { it.serverId == serverId && it.id == userId } }
 
     override fun getUserFlow(
         serverId: UUID,
@@ -104,20 +120,25 @@ class JsonServerDao(
         }
 
     override fun getServers(): List<JellyfinServerUsers> =
-        _fileState.value.servers.map { server ->
-            JellyfinServerUsers(
-                server = server,
-                users = _fileState.value.users.filter { it.serverId == server.id },
-            )
+        synchronized(lock) {
+            val data = _fileState.value
+            data.servers.map { server ->
+                JellyfinServerUsers(
+                    server = server,
+                    users = data.users.filter { it.serverId == server.id },
+                )
+            }
         }
 
-    override fun getServer(serverId: UUID): JellyfinServerUsers? {
-        val server = _fileState.value.servers.firstOrNull { it.id == serverId } ?: return null
-        return JellyfinServerUsers(
-            server = server,
-            users = _fileState.value.users.filter { it.serverId == server.id },
-        )
-    }
+    override fun getServer(serverId: UUID): JellyfinServerUsers? =
+        synchronized(lock) {
+            val data = _fileState.value
+            val server = data.servers.firstOrNull { it.id == serverId } ?: return null
+            JellyfinServerUsers(
+                server = server,
+                users = data.users.filter { it.serverId == server.id },
+            )
+        }
 
     override fun deleteServer(serverId: UUID) {
         updateValue { data ->
@@ -138,7 +159,9 @@ class JsonServerDao(
     }
 
     private fun updateValue(transform: (ServersFile) -> ServersFile) {
-        _fileState.value = _fileState.value.let(transform)
-        save(_fileState.value)
+        synchronized(lock) {
+            _fileState.value = _fileState.value.let(transform)
+            save(_fileState.value)
+        }
     }
 }

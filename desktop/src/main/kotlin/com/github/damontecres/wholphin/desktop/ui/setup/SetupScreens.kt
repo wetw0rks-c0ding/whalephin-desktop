@@ -120,17 +120,21 @@ fun ServerListContent(
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = urlInput,
-                onValueChange = { urlInput = it },
+                onValueChange = {
+                    urlInput = it
+                    viewModel.clearAddServerState()
+                },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Server address, e.g. http://192.168.1.10:8096") },
                 singleLine = true,
             )
             Spacer(Modifier.width(8.dp))
-            Button(onClick = {
-                if (urlInput.isNotBlank()) {
+            Button(
+                enabled = urlInput.isNotBlank() && state.addServerState !is LoadingState.Loading,
+                onClick = {
                     viewModel.addServer(urlInput.trim())
-                }
-            }) {
+                },
+            ) {
                 Text("Add")
             }
         }

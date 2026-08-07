@@ -21,6 +21,7 @@ import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.DeviceInfo
 import java.io.File
+import java.util.UUID
 
 /**
  * XDG Base Directory spec implementation of [AppPaths] for Linux/desktop.
@@ -71,13 +72,25 @@ class DataStorePreferenceStorage(
 
 /**
  * A [DeviceInfo] identifying this app instance to Jellyfin servers.
- * Desktop equivalent of `androidDevice(context)`.
+ * Desktop equivalent of `androidDevice(context)`. The device id is persisted so the
+ * server sees a stable device identity across app restarts.
  */
-private fun desktopDeviceInfo(): DeviceInfo =
+private fun desktopDeviceInfo(appPaths: AppPaths): DeviceInfo =
     DeviceInfo(
-        id = "wholphin-desktop",
+        id = deviceId(appPaths),
         name = "Wholphin Desktop",
     )
+
+private fun deviceId(appPaths: AppPaths): String {
+    val file = File(appPaths.dataDir, "device-id")
+    file.parentFile?.mkdirs()
+    if (file.exists()) {
+        return file.readText().trim()
+    }
+    val id = UUID.randomUUID().toString()
+    file.writeText(id)
+    return id
+}
 
 val desktopModule = module {
     single<AppPaths> { XdgAppPaths() }
@@ -85,7 +98,7 @@ val desktopModule = module {
     single {
         JellyfinClientFactory(
             clientInfo = ClientInfo(name = "Wholphin Desktop", version = "0.0.0-dev"),
-            deviceInfo = desktopDeviceInfo(),
+            deviceInfo = desktopDeviceInfo(get()),
         )
     }
     single<Jellyfin> { get<JellyfinClientFactory>().jellyfin }

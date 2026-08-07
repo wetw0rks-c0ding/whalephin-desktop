@@ -78,10 +78,14 @@ class SwitchServerViewModel(
             } else {
                 ServerVersionSupported.UNKNOWN
             }
-        _state.update {
+        _state.update { state ->
+            val index = state.servers.indexOfFirst { it.server.id == server.id }
+            if (index < 0) {
+                // Server was removed while the check was in flight; ignore the stale result
+                return@update state
+            }
             val servers =
-                it.servers.toMutableList().apply {
-                    val index = indexOfFirst { it.server.id == server.id }
+                state.servers.toMutableList().apply {
                     set(
                         index,
                         get(index).copy(
@@ -91,7 +95,7 @@ class SwitchServerViewModel(
                         ),
                     )
                 }
-            it.copy(servers = servers)
+            state.copy(servers = servers)
         }
     }
 

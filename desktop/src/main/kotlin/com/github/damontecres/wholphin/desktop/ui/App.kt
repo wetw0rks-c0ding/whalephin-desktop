@@ -37,6 +37,8 @@ import com.github.damontecres.wholphin.desktop.ui.setup.UserListContent
 import com.github.damontecres.wholphin.desktop.ui.setup.rememberSwitchServerViewModel
 import com.github.damontecres.wholphin.desktop.ui.setup.rememberSwitchUserViewModel
 import com.github.damontecres.wholphin.services.PreferenceStorage
+import com.github.damontecres.wholphin.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -89,7 +91,6 @@ fun WholphinApp() {
 private fun StartupScreen(navigationManager: SetupNavigationManager) {
     val serverRepository = koinInject<ServerRepository>()
     val preferenceStorage = koinInject<PreferenceStorage>()
-    var failure by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -117,8 +118,10 @@ private fun StartupScreen(navigationManager: SetupNavigationManager) {
                 current.user.pin != null -> navigationManager.navigateTo(SetupDestination.PinEntry(current))
                 else -> navigationManager.navigateTo(SetupDestination.AppContent(current))
             }
+        } catch (ex: CancellationException) {
+            throw ex
         } catch (ex: Exception) {
-            failure = ex.localizedMessage ?: ex.toString()
+            Log.e(ex, "Error restoring session")
             navigationManager.navigateTo(SetupDestination.ServerList)
         }
     }
@@ -127,7 +130,7 @@ private fun StartupScreen(navigationManager: SetupNavigationManager) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(16.dp))
-            Text(failure ?: "Restoring session...")
+            Text("Restoring session...")
         }
     }
 }
@@ -143,6 +146,7 @@ private fun AppContentScreen(
 ) {
     val serverRepository = koinInject<ServerRepository>()
     val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxSize().padding(48.dp),
         verticalArrangement = Arrangement.Center,
@@ -162,18 +166,26 @@ private fun AppContentScreen(
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
+                enabled = !busy,
                 onClick = {
                     // Forget the current session and go back to the server list
-                    scope.launch { serverRepository.switchServerOrUser() }
-                    navigationManager.navigateTo(SetupDestination.ServerList)
+                    busy = true
+                    scope.launch {
+                        serverRepository.switchServerOrUser()
+                        navigationManager.navigateTo(SetupDestination.ServerList)
+                    }
                 },
             ) {
                 Text("Switch server")
             }
             OutlinedButton(
+                enabled = !busy,
                 onClick = {
-                    scope.launch { serverRepository.closeSession() }
-                    navigationManager.navigateTo(SetupDestination.ServerList)
+                    busy = true
+                    scope.launch {
+                        serverRepository.closeSession()
+                        navigationManager.navigateTo(SetupDestination.ServerList)
+                    }
                 },
             ) {
                 Text("Disconnect")

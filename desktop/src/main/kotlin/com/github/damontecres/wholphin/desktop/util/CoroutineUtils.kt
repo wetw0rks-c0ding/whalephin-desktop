@@ -18,7 +18,7 @@ fun CoroutineScope.launchIO(
     context: CoroutineContext = ExceptionHandler(),
     start: CoroutineStart = CoroutineStart.DEFAULT,
     block: suspend CoroutineScope.() -> Unit,
-): Job = launch(context = WholphinDispatchers.IO + context, start = start, block = block)
+): Job = launch(context = context + WholphinDispatchers.IO, start = start, block = block)
 
 /**
  * Launches a coroutine on [WholphinDispatchers.Default] with an [ExceptionHandler]
@@ -27,7 +27,7 @@ fun CoroutineScope.launchDefault(
     context: CoroutineContext = ExceptionHandler(),
     start: CoroutineStart = CoroutineStart.DEFAULT,
     block: suspend CoroutineScope.() -> Unit,
-): Job = launch(context = WholphinDispatchers.Default + context, start = start, block = block)
+): Job = launch(context = context + WholphinDispatchers.Default, start = start, block = block)
 
 /**
  * Desktop equivalent of `viewModelScope`: a scope tied to a screen, cancelled when the
