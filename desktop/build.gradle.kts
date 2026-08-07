@@ -29,10 +29,23 @@ dependencies {
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
+    implementation(libs.koin.compose)
 
     implementation(libs.datastore.preferences.core)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
+
+    implementation(libs.jellyfin.core)
+    implementation(libs.jellyfin.api)
+    implementation(libs.kotlinx.serialization.core)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 compose.desktop {

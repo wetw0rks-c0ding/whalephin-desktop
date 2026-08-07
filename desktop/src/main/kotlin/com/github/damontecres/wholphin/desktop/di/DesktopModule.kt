@@ -4,7 +4,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import com.github.damontecres.wholphin.data.ServerDao
+import com.github.damontecres.wholphin.data.ServerRepository
+import com.github.damontecres.wholphin.desktop.data.JsonServerDao
+import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.services.AppPaths
+import com.github.damontecres.wholphin.services.JellyfinClientFactory
 import com.github.damontecres.wholphin.services.PreferenceStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +17,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.koin.dsl.module
+import org.jellyfin.sdk.Jellyfin
+import org.jellyfin.sdk.model.ClientInfo
+import org.jellyfin.sdk.model.DeviceInfo
 import java.io.File
 
 /**
@@ -61,7 +69,34 @@ class DataStorePreferenceStorage(
     }
 }
 
+/**
+ * A [DeviceInfo] identifying this app instance to Jellyfin servers.
+ * Desktop equivalent of `androidDevice(context)`.
+ */
+private fun desktopDeviceInfo(): DeviceInfo =
+    DeviceInfo(
+        id = "wholphin-desktop",
+        name = "Wholphin Desktop",
+    )
+
 val desktopModule = module {
     single<AppPaths> { XdgAppPaths() }
     single<PreferenceStorage> { DataStorePreferenceStorage(get()) }
+    single {
+        JellyfinClientFactory(
+            clientInfo = ClientInfo(name = "Wholphin Desktop", version = "0.0.0-dev"),
+            deviceInfo = desktopDeviceInfo(),
+        )
+    }
+    single<Jellyfin> { get<JellyfinClientFactory>().jellyfin }
+    single { get<JellyfinClientFactory>().apiClient }
+    single<ServerDao> { JsonServerDao(File(get<AppPaths>().dataDir, "servers.json")) }
+    single {
+        ServerRepository(
+            apiClient = get(),
+            serverDao = get(),
+            preferenceStorage = get(),
+        )
+    }
+    single { SetupNavigationManager() }
 }

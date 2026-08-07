@@ -1,0 +1,309 @@
+package com.github.damontecres.wholphin.desktop.ui.setup
+
+import com.github.damontecres.wholphin.data.ServerDao
+import com.github.damontecres.wholphin.data.ServerRepository
+import com.github.damontecres.wholphin.data.model.JellyfinServer
+import com.github.damontecres.wholphin.data.model.JellyfinUser
+import com.github.damontecres.wholphin.desktop.services.SetupDestination
+import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
+import com.github.damontecres.wholphin.desktop.util.DesktopViewModel
+import com.github.damontecres.wholphin.desktop.util.launchDefault
+import com.github.damontecres.wholphin.desktop.util.launchIO
+import com.github.damontecres.wholphin.util.LoadingState
+import com.github.damontecres.wholphin.util.Log
+import com.github.damontecres.wholphin.util.WholphinDispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
+import org.jellyfin.sdk.Jellyfin
+import org.jellyfin.sdk.api.client.HttpClientOptions
+import org.jellyfin.sdk.api.client.exception.InvalidStatusException
+import org.jellyfin.sdk.api.client.extensions.authenticateUserByName
+import org.jellyfin.sdk.api.client.extensions.imageApi
+import org.jellyfin.sdk.api.client.extensions.quickConnectApi
+import org.jellyfin.sdk.api.client.extensions.systemApi
+import org.jellyfin.sdk.api.client.extensions.userApi
+import org.jellyfin.sdk.model.ServerVersion
+import org.jellyfin.sdk.model.api.QuickConnectDto
+import org.jellyfin.sdk.model.api.QuickConnectResult
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Desktop port of the Android `SwitchUserViewModel` (assisted-inject/ImageUrlService/Toast removed).
+ */
+class SwitchUserViewModel(
+    val jellyfin: Jellyfin,
+    val serverRepository: ServerRepository,
+    val serverDao: ServerDao,
+    val setupNavigationManager: SetupNavigationManager,
+    val server: JellyfinServer,
+) : DesktopViewModel() {
+    private val _state = MutableStateFlow(SwitchUserState())
+    val state: StateFlow<SwitchUserState> = _state
+
+    private var quickConnectJob: Job? = null
+
+    fun clearSwitchUserState() {
+        _state.update { it.copy(switchUserState = LoadingState.Pending) }
+    }
+
+    fun resetAttempts() {
+        _state.update { it.copy(loginAttempts = 0) }
+    }
+
+    fun init() {
+        viewModelScope.launchDefault {
+            serverRepository.switchServerOrUser()
+        }
+        quickConnectJob?.cancel()
+        viewModelScope.launchIO {
+            _state.update { SwitchUserState() }
+            try {
+                val serverUsers = getUsers()
+                val (serverVersion, supported) = checkServerVersion()
+                _state.update {
+                    it.copy(
+                        loading = LoadingState.Success,
+                        users = serverUsers,
+                        serverVersion = serverVersion,
+                        serverVersionSupported = supported,
+                    )
+                }
+            } catch (ex: Exception) {
+                Log.e(ex, "Error fetching users for server $server")
+                _state.update {
+                    it.copy(
+                        loading = LoadingState.Error(ex),
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launchIO {
+            try {
+                val quickConnect by
+                    jellyfin
+                        .createApi(
+                            server.url,
+                            httpClientOptions =
+                                HttpClientOptions(
+                                    requestTimeout = 6.seconds,
+                                    connectTimeout = 6.seconds,
+                                    socketTimeout = 6.seconds,
+                                ),
+                        ).quickConnectApi
+                        .getQuickConnectEnabled()
+                _state.update { it.copy(quickConnectEnabled = quickConnect) }
+            } catch (_: CancellationException) {
+                // no-op, user may have canceled
+            } catch (ex: Exception) {
+                Log.w(ex, "Error checking quick connect for server ${server.url}")
+                _state.update { it.copy(quickConnectEnabled = false) }
+            }
+        }
+    }
+
+    fun trySwitchUser(user: JellyfinUser): Deferred<String?> =
+        viewModelScope.async(WholphinDispatchers.IO) {
+            try {
+                val current = serverRepository.changeUser(server, user)
+                setupNavigationManager.navigateTo(SetupDestination.AppContent(current))
+                null
+            } catch (ex: InvalidStatusException) {
+                if (ex.status == 401) {
+                    "Credentials expired, please login in again"
+                } else {
+                    ex.localizedMessage
+                }
+            } catch (ex: Exception) {
+                Log.e(ex, "Error switching user")
+                ex.localizedMessage
+            }
+        }
+
+    fun login(
+        server: JellyfinServer,
+        existingUser: JellyfinUser?,
+        username: String,
+        password: String,
+    ) {
+        quickConnectJob?.cancel()
+        viewModelScope.launchIO {
+            try {
+                val api = jellyfin.createApi(baseUrl = server.url)
+                val authenticationResult by api.userApi.authenticateUserByName(
+                    username = username,
+                    password = password,
+                )
+                val current =
+                    serverRepository.changeUser(server.url, authenticationResult, existingUser)
+                setupNavigationManager.navigateTo(SetupDestination.AppContent(current))
+            } catch (ex: Exception) {
+                Log.e(ex, "Error logging in user")
+                if (ex is InvalidStatusException && ex.status == 401) {
+                    _state.update { it.copy(switchUserState = LoadingState.Error("Invalid username or password")) }
+                } else {
+                    setError("Error during login", ex)
+                }
+            }
+        }
+    }
+
+    fun initiateQuickConnect(
+        server: JellyfinServer,
+        existingUser: JellyfinUser?,
+    ) {
+        quickConnectJob?.cancel()
+        quickConnectJob =
+            viewModelScope.launchIO {
+                try {
+                    val api = jellyfin.createApi(server.url)
+                    var quickConnectStatus =
+                        api
+                            .quickConnectApi
+                            .initiateQuickConnect()
+                            .content
+                    _state.update { it.copy(quickConnectStatus = quickConnectStatus) }
+
+                    while (!quickConnectStatus.authenticated) {
+                        delay(5_000L)
+                        quickConnectStatus =
+                            api.quickConnectApi
+                                .getQuickConnectState(
+                                    secret = quickConnectStatus.secret,
+                                ).content
+                        _state.update { it.copy(quickConnectStatus = quickConnectStatus) }
+                    }
+                    val authenticationResult by api.userApi.authenticateWithQuickConnect(
+                        QuickConnectDto(secret = quickConnectStatus.secret),
+                    )
+                    val current =
+                        serverRepository.changeUser(
+                            server.url,
+                            authenticationResult,
+                            existingUser,
+                        )
+                    setupNavigationManager.navigateTo(SetupDestination.AppContent(current))
+                } catch (_: CancellationException) {
+                    // no-op, user may have canceled
+                } catch (ex: Exception) {
+                    Log.e(ex, "Error during quick connect")
+                    if (ex is InvalidStatusException && ex.status == 401) {
+                        _state.update {
+                            it.copy(
+                                quickConnectEnabled = false,
+                                quickConnectStatus = null,
+                            )
+                        }
+                    }
+                    setError("Error with Quick Connect", ex)
+                }
+            }
+    }
+
+    fun cancelQuickConnect() {
+        quickConnectJob?.cancel()
+        _state.update {
+            it.copy(
+                quickConnectStatus = null,
+            )
+        }
+    }
+
+    fun removeUser(user: JellyfinUser) {
+        viewModelScope.launchIO {
+            serverRepository.removeUser(user)
+            val serverUsers = getUsers()
+            _state.update { it.copy(users = serverUsers) }
+        }
+    }
+
+    private suspend fun getUsers(): List<JellyfinUserAndImage> =
+        withContext(WholphinDispatchers.IO) {
+            val api = jellyfin.createApi(server.url)
+            val knownUsers =
+                serverDao
+                    .getServer(server.id)
+                    ?.users
+                    .orEmpty()
+                    .map {
+                        JellyfinUserAndImage(
+                            user = it,
+                            imageUrl = api.imageApi.getUserImageUrl(it.id),
+                            known = true,
+                        )
+                    }
+            val knownUserIds = knownUsers.map { it.user.id }
+            val publicUsers =
+                api.userApi
+                    .getPublicUsers()
+                    .content
+                    .map {
+                        JellyfinUser(
+                            id = it.id,
+                            name = it.name,
+                            serverId = server.id,
+                            accessToken = null,
+                        )
+                    }.filter { it.id !in knownUserIds }
+                    .map {
+                        JellyfinUserAndImage(
+                            user = it,
+                            imageUrl = api.imageApi.getUserImageUrl(it.id),
+                            known = false,
+                        )
+                    }
+
+            knownUsers + publicUsers
+        }
+
+    private suspend fun checkServerVersion(): Pair<String?, ServerVersionSupported> {
+        val api = jellyfin.createApi(server.url)
+        val systemInfo by api.systemApi.getPublicSystemInfo()
+        val serverVersion = systemInfo.version?.let { ServerVersion.fromString(it) }
+        return if (serverVersion == null) {
+            systemInfo.version to ServerVersionSupported.UNKNOWN
+        } else if (serverVersion < Jellyfin.minimumVersion) {
+            systemInfo.version to ServerVersionSupported.NOT_SUPPORTED
+        } else {
+            systemInfo.version to ServerVersionSupported.SUPPORTED
+        }
+    }
+
+    private fun setError(
+        msg: String? = null,
+        ex: Exception? = null,
+    ) {
+        _state.update {
+            it.copy(
+                loginAttempts = it.loginAttempts + 1,
+                switchUserState = LoadingState.Error(msg, ex),
+            )
+        }
+    }
+}
+
+data class JellyfinUserAndImage(
+    val user: JellyfinUser,
+    val imageUrl: String?,
+    val known: Boolean,
+)
+
+data class SwitchUserState(
+    // LoadingState for fetching available users
+    val loading: LoadingState = LoadingState.Pending,
+    val quickConnectEnabled: Boolean = false,
+    val quickConnectStatus: QuickConnectResult? = null,
+    val users: List<JellyfinUserAndImage> = emptyList(),
+    // LoadingState for while adding/switching users
+    val switchUserState: LoadingState = LoadingState.Pending,
+    val loginAttempts: Int = 0,
+    val serverVersion: String? = null,
+    val serverVersionSupported: ServerVersionSupported = ServerVersionSupported.UNKNOWN,
+)

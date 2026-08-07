@@ -17,6 +17,12 @@ kotlin {
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.datastore.preferences.core)
+            implementation(libs.jellyfin.core)
+            implementation(libs.jellyfin.api)
+        }
+        jvmMain.dependencies {
+            implementation(libs.jellyfin.api.okhttp)
+            implementation(libs.okhttp.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
