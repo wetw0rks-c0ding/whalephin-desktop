@@ -51,4 +51,11 @@ sealed class Destination(
         val config: HomeRowConfig,
         val initialPosition: Int = 0,
     ) : Destination()
+
+    @Serializable
+    data class Playback(
+        val itemId: UUID,
+        val type: BaseItemKind,
+        val positionMs: Long = 0,
+    ) : Destination(fullScreen = true)
 }

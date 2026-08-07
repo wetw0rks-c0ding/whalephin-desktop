@@ -8,6 +8,9 @@ import com.github.damontecres.wholphin.data.ServerDao
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.desktop.data.JsonServerDao
 import com.github.damontecres.wholphin.desktop.data.LibraryDisplayInfoStore
+import com.github.damontecres.wholphin.data.playback.PlaybackEngine
+import com.github.damontecres.wholphin.desktop.data.ItemPlaybackStore
+import com.github.damontecres.wholphin.desktop.playback.MpvEngine
 import com.github.damontecres.wholphin.desktop.services.HomeRowService
 import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
@@ -122,4 +125,6 @@ val desktopModule = module {
     single { ImageUrlService(api = get()) }
     single { HomeSettingsService(api = get()) }
     single { HomeRowService(serverRepository = get(), homeSettingsService = get()) }
+    single { MpvEngine(engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())) }
+    single { ItemPlaybackStore(File(get<AppPaths>().dataDir, "item-playback.json")) }
 }

@@ -80,6 +80,14 @@ fun DestinationContent(
                         config = destination.config,
                         onItemClick = onItemClick,
                     )
+
+                is Destination.Playback ->
+                    PlaybackScreen(
+                        itemId = destination.itemId,
+                        type = destination.type,
+                        initialPositionMs = destination.positionMs,
+                        onItemClick = onItemClick,
+                    )
             }
         }
     }
