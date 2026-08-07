@@ -194,7 +194,15 @@ class PreferenceWriter(
                 return
             } catch (_: Exception) {
                 attempt++
-                if (attempt >= MAX_WRITE_ATTEMPTS) return
+                if (attempt >= MAX_WRITE_ATTEMPTS) {
+                    // Re-queue the batch so it isn't silently lost. Any edits
+                    // that arrived during the retry cycle are already composed
+                    // into the current composedBatch and will fire next cycle.
+                    synchronized(this) {
+                        composedBatch = compose(batch, composedBatch)
+                    }
+                    return
+                }
                 delay(RETRY_DELAY_MS * attempt)
             }
         }
