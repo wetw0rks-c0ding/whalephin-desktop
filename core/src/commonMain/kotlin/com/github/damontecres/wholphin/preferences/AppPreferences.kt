@@ -1,7 +1,6 @@
 package com.github.damontecres.wholphin.preferences
 
 import kotlinx.serialization.Serializable
-import java.util.UUID
 
 /**
  * Desktop port of the Android app's AppPreferences.

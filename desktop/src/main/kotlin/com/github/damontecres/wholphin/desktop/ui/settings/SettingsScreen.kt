@@ -14,7 +14,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.services.PreferenceStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,21 +27,39 @@ fun SettingsPage(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     preferenceStorage: PreferenceStorage = koinInject(),
+    appScope: CoroutineScope = koinInject(),
 ) {
+    // Persisted state emits asynchronously; replace defaults once loaded unless the
+    // user has an edit still pending, in which case keep the local value.
     val storedPrefs by preferenceStorage.appPreferences.collectAsState(initial = AppPreferences())
     var appPrefs by remember { mutableStateOf(storedPrefs) }
     var selectedSection by remember { mutableIntStateOf(0) }
 
-    val scope = rememberCoroutineScope()
-
-    fun updatePrefs(task: AppPreferences.() -> AppPreferences) {
-        appPrefs = task(appPrefs.copy())
-        scope.launch {
-            kotlinx.coroutines.delay(400)
+    // A queue of pending writes drained on the app-scoped scope, so debounced
+    // persistence survives navigating away from this screen.
+    val pendingWrites = remember {
+        MutableSharedFlow<AppPreferences.() -> AppPreferences>(extraBufferCapacity = 64)
+    }
+    LaunchedEffect(appScope, pendingWrites) {
+        pendingWrites.collectLatest { task ->
+            delay(400)
             preferenceStorage.updateAppPreferences {
                 with(copy()) { task() }
             }
         }
+    }
+
+    fun updatePrefs(task: AppPreferences.() -> AppPreferences) {
+        appPrefs = task(appPrefs.copy())
+        pendingWrites.tryEmit(task)
+    }
+
+    // Sync asynchronously-loaded persisted values back into local state,
+    // replacing the initial default once the store has actually emitted.
+    // Edits made here are written to the same store, so the echo is a no-op
+    // (equal values) and never clobbers in-progress changes.
+    LaunchedEffect(storedPrefs) {
+        appPrefs = storedPrefs
     }
 
     val sections = listOf(
@@ -134,6 +156,7 @@ private fun SliderPref(item: PrefItem.Slider, modifier: Modifier = Modifier) {
             value = item.value.toFloat(),
             onValueChange = { item.onValueChange(it.toLong()) },
             valueRange = item.valueRange,
+            steps = maxOf(0, (item.valueRange.endInclusive - item.valueRange.start).toInt() - 1),
             enabled = item.enabled,
         )
     }
@@ -144,7 +167,7 @@ private fun ChoicePref(item: PrefItem.SingleChoice, modifier: Modifier = Modifie
     var expanded by remember { mutableStateOf(false) }
     Box {
         Row(
-            modifier = modifier.fillMaxWidth().clickable { expanded = true }.padding(vertical = 4.dp),
+            modifier = modifier.fillMaxWidth().clickable(enabled = item.enabled) { expanded = true }.padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -159,6 +182,7 @@ private fun ChoicePref(item: PrefItem.SingleChoice, modifier: Modifier = Modifie
             item.options.forEachIndexed { index, option ->
                 DropdownMenuItem(
                     text = { Text(option, fontWeight = if (index == item.selectedIndex) FontWeight.Bold else FontWeight.Normal) },
+                    enabled = item.enabled,
                     onClick = { item.onSelected(index); expanded = false },
                 )
             }

@@ -30,11 +30,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.dsl.module
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.DeviceInfo
 import java.io.File
+import java.nio.file.StandardCopyOption
+import java.nio.file.Files
 import java.util.UUID
 
 /**
@@ -68,6 +72,7 @@ class AppPreferencesStore(
     private val file = File(appPaths.dataDir, "app-preferences.json")
     private val serializer = AppPreferencesSerializer()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val mutex = Mutex()
     private val _data = MutableStateFlow<AppPreferences?>(null)
     val data: Flow<AppPreferences> = _data
         .map { it ?: serializer.defaultValue }
@@ -90,11 +95,18 @@ class AppPreferencesStore(
         }
     }
 
+    /**
+     * Atomically computes the next preferences from the last persisted value,
+     * persists it, and only then publishes it. A failed write leaves both the
+     * file and the in-memory state unchanged.
+     */
     suspend fun updateData(block: AppPreferences.() -> AppPreferences) {
-        val current = _data.value ?: serializer.defaultValue
-        val newPrefs = current.block()
-        _data.value = newPrefs
-        save(newPrefs)
+        mutex.withLock {
+            val current = _data.value ?: serializer.defaultValue
+            val newPrefs = current.block()
+            save(newPrefs)
+            _data.value = newPrefs
+        }
     }
 
     private suspend fun save(prefs: AppPreferences) {
@@ -102,10 +114,12 @@ class AppPreferencesStore(
         try {
             val content = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
                 .encodeToString(prefs)
-            tmpFile.writeText(content)
-            tmpFile.renameTo(file)
-            file.setReadable(true, false)
-            file.setWritable(true, false)
+            Files.write(tmpFile.toPath(), content.toByteArray())
+            Files.move(
+                tmpFile.toPath(),
+                file.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
         } catch (e: Exception) {
             tmpFile.delete()
             throw e
@@ -161,6 +175,7 @@ private fun deviceId(appPaths: AppPaths): String {
 
 val desktopModule = module {
     single<AppPaths> { XdgAppPaths() }
+    single { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     single<PreferenceStorage> { DataStorePreferenceStorage(get()) }
     single {
         JellyfinClientFactory(
