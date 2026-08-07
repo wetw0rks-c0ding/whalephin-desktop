@@ -7,8 +7,11 @@ import androidx.datastore.preferences.core.edit
 import com.github.damontecres.wholphin.data.ServerDao
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.desktop.data.JsonServerDao
+import com.github.damontecres.wholphin.desktop.data.LibraryDisplayInfoStore
+import com.github.damontecres.wholphin.desktop.services.NavigationManager
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.services.AppPaths
+import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.JellyfinClientFactory
 import com.github.damontecres.wholphin.services.PreferenceStorage
 import kotlinx.coroutines.CoroutineScope
@@ -112,4 +115,7 @@ val desktopModule = module {
         )
     }
     single { SetupNavigationManager() }
+    single { NavigationManager() }
+    single { LibraryDisplayInfoStore(File(get<AppPaths>().dataDir, "library-display-info.json")) }
+    single { ImageUrlService(api = get()) }
 }
