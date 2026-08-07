@@ -178,8 +178,13 @@ class PreferenceWriter(
             // (composed) edits as one atomic write, retrying transient failures.
             while (true) {
                 delay(400)
-                val batch = composedBatch
-                composedBatch = { it }
+                // Atomically capture-and-clear under the same lock used by enqueue
+                // so an edit arriving during capture is never overwritten by reset.
+                val batch = synchronized(this@PreferenceWriter) {
+                    val b = composedBatch
+                    composedBatch = IDLE
+                    b
+                }
                 if (batch === IDLE) continue
                 persistWithRetry(batch)
             }

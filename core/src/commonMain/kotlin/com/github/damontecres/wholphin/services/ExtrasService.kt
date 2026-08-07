@@ -51,7 +51,7 @@ class ExtrasService(
                         title = title,
                         subtitle = subtitle,
                         isPlayed = items.all { it.played },
-                        imageUrl = imageUrlService.getItemImageUrl(items.random(), ImageType.PRIMARY),
+                        imageUrl = imageUrlService.getItemImageUrl(items.first(), ImageType.PRIMARY),
                     )
                 } else {
                     null
