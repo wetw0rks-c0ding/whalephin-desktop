@@ -51,17 +51,20 @@ class JsonServerDao(
     private fun save(data: ServersFile) {
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
+        // Restrict permissions before writing so tokens never sit in a world-readable file
+        tmp.createNewFile()
         setOwnerOnly(tmp)
+        tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
         if (!tmp.renameTo(file)) {
             // Rename failed: keep a backup of the old file, then copy the tmp content over
             if (file.exists()) {
                 file.renameTo(File(file.parentFile, file.name + ".bak"))
             }
+            file.createNewFile()
+            setOwnerOnly(file)
             file.writeText(tmp.readText())
             tmp.delete()
         }
-        setOwnerOnly(file)
     }
 
     /** Restricts a file to owner read/write (0600) since it contains access tokens */
