@@ -148,7 +148,7 @@ data class GetItemsFilter(
             videoTypes = videoTypes ?: filter.videoTypes,
             years = years ?: filter.years,
             decades = decades ?: filter.decades,
-            override = override,
+            override = override.takeUnless { it == GetItemsFilterOverride.NONE } ?: filter.override,
         )
 }
 
