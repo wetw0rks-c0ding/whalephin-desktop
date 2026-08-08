@@ -48,7 +48,7 @@ fun SearchPage(
     }
     val state by viewModel.state.collectAsState()
 
-    var query by remember { mutableStateOf(initialQuery) }
+    var query by remember(initialQuery) { mutableStateOf(initialQuery) }
     LaunchedEffect(query) { viewModel.search(query) }
 
     Column(modifier = modifier.fillMaxSize()) {

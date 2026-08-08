@@ -52,6 +52,7 @@ data class ItemDetailState(
     val item: BaseItem? = null,
     val trailers: List<Trailer> = emptyList(),
     val extras: List<ExtrasItem> = emptyList(),
+    val actionError: String? = null,
 )
 
 class ItemDetailViewModel(
@@ -111,7 +112,7 @@ class ItemDetailViewModel(
             } catch (ex: kotlinx.coroutines.CancellationException) {
                 throw ex
             } catch (ex: Exception) {
-                _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
+                _state.update { it.copy(actionError = "Failed to update favorite: ${ex.message}") }
             }
         }
     }
@@ -129,7 +130,7 @@ class ItemDetailViewModel(
             } catch (ex: kotlinx.coroutines.CancellationException) {
                 throw ex
             } catch (ex: Exception) {
-                _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
+                _state.update { it.copy(actionError = "Failed to update watched: ${ex.message}") }
             }
         }
     }

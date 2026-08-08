@@ -3,6 +3,8 @@ package com.github.damontecres.wholphin.desktop.data
 import com.github.damontecres.wholphin.data.model.ItemPlayback
 import com.github.damontecres.wholphin.util.Log
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -25,7 +27,9 @@ class ItemPlaybackStore(
             runCatching { json.decodeFromString<List<ItemPlayback>>(file.readText()) }
                 .getOrElse { ex ->
                     Log.e(ex, "Corrupt item playback store, backing up to .bak")
-                    file.copyTo(File(file.path + ".bak"), overwrite = true)
+                    val bak = File(file.path + ".bak")
+                    setOwnerOnly(bak)
+                    file.copyTo(bak, overwrite = true)
                     emptyList()
                 }
                 .associateBy { it.itemId }
@@ -48,16 +52,21 @@ class ItemPlaybackStore(
     }
 
     private fun atomicReplace(content: String) {
-        val tmp = File(file.path + ".tmp")
+        val tmp = File(file.path + "." + System.currentTimeMillis() + ".tmp")
         setOwnerOnly(tmp)
         tmp.writeText(content)
-        if (!tmp.renameTo(file)) {
-            // Rename failed: fallback — back up the existing file, then copy over
+        try {
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: Exception) {
+            // Atomic move not supported on this filesystem — fall back to backup-and-copy
             if (file.exists()) {
-                file.renameTo(File(file.path + ".bak"))
+                val bak = File(file.path + ".bak")
+                setOwnerOnly(bak)
+                Files.move(file.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
             setOwnerOnly(file)
-            file.writeText(tmp.readText())
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
             tmp.delete()
         }
     }

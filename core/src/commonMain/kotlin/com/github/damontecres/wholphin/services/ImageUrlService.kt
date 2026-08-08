@@ -32,7 +32,7 @@ class ImageUrlService(
         return when (imageType) {
             ImageType.LOGO -> {
                 if (seriesId != null && (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)) {
-                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else {
                     getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 }
@@ -40,7 +40,7 @@ class ImageUrlService(
 
             ImageType.BACKDROP -> {
                 if (seriesId != null && (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)) {
-                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else if (backdropTags.isNotEmpty()) {
                     getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else {
@@ -52,13 +52,13 @@ class ImageUrlService(
                 if (useSeriesForPrimary && parentThumbId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else if (useSeriesForPrimary && parentBackdropId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(parentBackdropId, ImageType.BACKDROP, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(parentBackdropId, ImageType.BACKDROP, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else if (parentThumbId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
-                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else if (useSeriesForPrimary &&
                     parentThumbId == null &&
                     itemType == BaseItemKind.EPISODE &&
@@ -79,9 +79,9 @@ class ImageUrlService(
                 if (useSeriesForPrimary && seriesId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else if (seriesId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
-                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight)
                 } else {
                     getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 }

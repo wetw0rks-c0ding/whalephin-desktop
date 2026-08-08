@@ -41,7 +41,34 @@ class JsonServerDao(
     private val fileState: Flow<ServersFile> = _fileState
 
     private fun load(): ServersFile {
-        if (!file.exists()) return ServersFile()
+        if (!file.exists()) {
+            // Try to recover from a backup or tmp left behind by an interrupted save
+            val bakFile = file.parentFile?.listFiles()?.findLast {
+                it.name.startsWith(file.name + ".") && (it.name.endsWith(".bak") || it.name.endsWith(".tmp"))
+            }
+            if (bakFile != null && bakFile.exists()) {
+                return try {
+                    val data = Json { ignoreUnknownKeys = true }.decodeFromString<ServersFile>(bakFile.readText())
+                    // Restore from the backup: write it back as the primary
+                    Log.w("Recovered ${file.path} from backup ${bakFile.name}")
+                    file.parentFile?.mkdirs()
+                    val tmp = File(file.parentFile, file.name + ".tmp")
+                    tmp.createNewFile()
+                    setOwnerOnly(tmp)
+                    tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
+                    if (!tmp.renameTo(file)) {
+                        file.createNewFile()
+                        setOwnerOnly(file)
+                        file.writeText(tmp.readText())
+                        tmp.delete()
+                    }
+                    data
+                } catch (_: Exception) {
+                    ServersFile()
+                }
+            }
+            return ServersFile()
+        }
         return try {
             Json { ignoreUnknownKeys = true }.decodeFromString<ServersFile>(file.readText())
         } catch (ex: Exception) {
@@ -56,11 +83,11 @@ class JsonServerDao(
         }
     }
 
-    private fun save(data: ServersFile) {
+    private fun save(data: ServersFile): Boolean {
         if (persistBlocked) {
             Log.e("Persistence blocked: corrupt ${file.path} could not be backed up. " +
                 "Manually move or delete the file to restore writes.")
-            return
+            return false
         }
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
@@ -78,6 +105,7 @@ class JsonServerDao(
             file.writeText(tmp.readText())
             tmp.delete()
         }
+        return true
     }
 
     /** Restricts a file to owner read/write (0600) since it contains access tokens */
@@ -118,8 +146,9 @@ class JsonServerDao(
                     current.users + updated
                 }
             val newState = current.copy(users = users)
-            save(newState)
-            _fileState.value = newState
+            if (save(newState)) {
+                _fileState.value = newState
+            }
             updated
         }
 
@@ -178,8 +207,9 @@ class JsonServerDao(
     private fun updateValue(transform: (ServersFile) -> ServersFile) {
         synchronized(lock) {
             val newState = _fileState.value.let(transform)
-            save(newState)
-            _fileState.value = newState
+            if (save(newState)) {
+                _fileState.value = newState
+            }
         }
     }
 }
