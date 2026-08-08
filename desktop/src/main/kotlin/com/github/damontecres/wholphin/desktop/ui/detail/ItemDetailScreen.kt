@@ -92,6 +92,8 @@ class ItemDetailViewModel(
                         } catch (_: Exception) {}
                     }
                 }
+            } catch (ex: kotlinx.coroutines.CancellationException) {
+                throw ex
             } catch (ex: Exception) {
                 _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
             }
@@ -101,6 +103,8 @@ class ItemDetailViewModel(
     fun setFavorite(item: BaseItem, favorite: Boolean) {
         viewModelScope.launchIO {
             try {
+                // Clear any previous action error before attempting the mutation
+                _state.update { it.copy(actionError = null) }
                 api.itemsApi.updateItemUserData(
                     userId = null,
                     itemId = item.id,
@@ -108,7 +112,7 @@ class ItemDetailViewModel(
                 )
                 // Refresh after successful mutation
                 val dto = api.userLibraryApi.getItem(itemId = itemId).content
-                dto?.let { _state.update { s -> s.copy(item = BaseItem(it)) } }
+                dto?.let { _state.update { s -> s.copy(item = BaseItem(it), actionError = null) } }
             } catch (ex: kotlinx.coroutines.CancellationException) {
                 throw ex
             } catch (ex: Exception) {
@@ -120,13 +124,15 @@ class ItemDetailViewModel(
     fun setWatched(item: BaseItem, played: Boolean) {
         viewModelScope.launchIO {
             try {
+                // Clear any previous action error before attempting the mutation
+                _state.update { it.copy(actionError = null) }
                 api.itemsApi.updateItemUserData(
                     userId = null,
                     itemId = item.id,
                     data = UpdateUserItemDataDto(played = played),
                 )
                 val dto = api.userLibraryApi.getItem(itemId = itemId).content
-                dto?.let { _state.update { s -> s.copy(item = BaseItem(it)) } }
+                dto?.let { _state.update { s -> s.copy(item = BaseItem(it), actionError = null) } }
             } catch (ex: kotlinx.coroutines.CancellationException) {
                 throw ex
             } catch (ex: Exception) {
@@ -232,6 +238,10 @@ fun ItemDetailScreen(
                                         Text(if (item.played) "Mark unplayed" else "Mark played")
                                     }
                                 }
+                            }
+                            state.actionError?.let { error ->
+                                Spacer(Modifier.height(8.dp))
+                                Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }

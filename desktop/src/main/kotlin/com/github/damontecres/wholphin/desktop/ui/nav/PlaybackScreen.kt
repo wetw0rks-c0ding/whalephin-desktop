@@ -53,7 +53,7 @@ fun PlaybackScreen(
     engine: MpvEngine = koinInject(),
 ) {
     val info by engine.info.collectAsState()
-    var dragPos by remember { mutableStateOf(0L) }
+    var dragPos by remember(itemId, type) { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(engine, itemId, type, initialPositionMs) {
         engine.play("", initialPositionMs)
@@ -70,13 +70,14 @@ fun PlaybackScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Seekbar
-            val displayPos = if (dragPos > 0) dragPos else info.positionMs.coerceIn(0L, info.durationMs.coerceAtLeast(1L))
+            val maxPosition = info.durationMs.coerceAtLeast(1L)
+            val displayPos = (dragPos ?: info.positionMs).coerceIn(0L, maxPosition)
             Slider(
                 value = displayPos.toFloat(),
                 onValueChange = { v -> dragPos = v.toLong() },
                 onValueChangeFinished = {
-                    engine.seek(dragPos)
-                    dragPos = 0L
+                    dragPos?.let { engine.seek(it) }
+                    dragPos = null
                 },
                 valueRange = 0f..info.durationMs.coerceAtLeast(1L).toFloat(),
                 colors = SliderDefaults.colors(

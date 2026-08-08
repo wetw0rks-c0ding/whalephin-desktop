@@ -61,9 +61,9 @@ class ItemPlaybackStore(
         try {
             Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } catch (_: AtomicMoveNotSupportedException) {
-            // Atomic move not supported on this filesystem — fall back to copy
-            setOwnerOnly(file)
-            file.writeText(content)
+            // Atomic move not supported on this filesystem — non-atomic fallback preserves the temp
+            // as a recoverable generation if we crash mid-write
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
         } finally {
             tmp.delete()
         }
