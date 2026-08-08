@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
@@ -73,16 +75,19 @@ fun NavDrawer(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
-        libraries.forEachIndexed { index, library ->
-            DrawerItem(
-                icon = Icons.Filled.Movie,
-                title = library.name,
-                index = index + 2,
-                selectedIndex = selectedIndex,
-                onClick = { onLibrary(index) },
-            )
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+        ) {
+            libraries.forEachIndexed { index, library ->
+                DrawerItem(
+                    icon = Icons.Filled.Movie,
+                    title = library.name,
+                    index = index + 2,
+                    selectedIndex = selectedIndex,
+                    onClick = { onLibrary(index) },
+                )
+            }
         }
-        Spacer(Modifier.weight(1f))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
         Column(modifier = Modifier.padding(horizontal = 12.dp)) {

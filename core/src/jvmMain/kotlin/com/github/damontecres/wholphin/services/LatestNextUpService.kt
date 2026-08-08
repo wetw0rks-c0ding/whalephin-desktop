@@ -36,10 +36,9 @@ class LatestNextUpService(
             .orEmpty()
 
     suspend fun updateRemovedFromNextUp(userId: UUID) {
-        val removed = getRemovedFromNextUp(userId)
-        val newRemoved = removed.toMutableMap()
-        var changed = false
-        removed.forEach { (seriesId, timestamp) ->
+        // Collect pairs that may need removal from an initial read
+        val candidates = mutableSetOf<UUID>()
+        getRemovedFromNextUp(userId).forEach { (seriesId, timestamp) ->
             val item =
                 api.itemsApi
                     .getItems(
@@ -55,18 +54,24 @@ class LatestNextUpService(
             if (item != null) {
                 val lastPlayed = item.userData?.lastPlayedDate
                 if (lastPlayed != null && lastPlayed > timestamp) {
-                    newRemoved.remove(seriesId)
-                    changed = true
+                    candidates.add(seriesId)
                 }
             } else {
-                newRemoved.remove(seriesId)
-                changed = true
+                candidates.add(seriesId)
             }
         }
-        if (changed) {
-            displayPreferencesService.updateDisplayPreferences(userId) {
-                put(REMOVED_KEY, Json.encodeToString(RemovedSeriesIds(newRemoved)))
-            }
+        if (candidates.isEmpty()) return
+        // Inside the update lock, re-read the current value and only
+        // remove entries that are still present.
+        displayPreferencesService.updateDisplayPreferences(userId) {
+            val current =
+                get(REMOVED_KEY)
+                    ?.let { Json.decodeFromString<RemovedSeriesIds>(it).value }
+                    .orEmpty()
+                    .toMutableMap()
+            if (current.isEmpty()) return@updateDisplayPreferences
+            current.keys.removeAll(candidates)
+            put(REMOVED_KEY, Json.encodeToString(RemovedSeriesIds(current)))
         }
     }
 

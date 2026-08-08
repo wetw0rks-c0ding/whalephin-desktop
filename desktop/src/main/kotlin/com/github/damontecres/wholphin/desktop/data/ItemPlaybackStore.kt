@@ -36,25 +36,30 @@ class ItemPlaybackStore(
     fun save(itemPlayback: ItemPlayback) {
         lock.withLock {
             val updated = (load() + (itemPlayback.itemId to itemPlayback)).values.sortedBy { it.lastPlayed }
-            val tmp = File(file.path + ".tmp")
-            tmp.writeText(json.encodeToString(updated))
-            setOwnerOnly(tmp)
-            if (tmp.renameTo(file)) {
-                setOwnerOnly(file)
-            }
+            atomicReplace(json.encodeToString(updated))
         }
     }
 
     fun remove(itemId: UUID) {
         lock.withLock {
             val updated = load() - itemId
-            val tmp = File(file.path + ".tmp")
-            tmp.writeText(json.encodeToString(updated.values))
-            setOwnerOnly(tmp)
-            if (tmp.renameTo(file)) {
-                setOwnerOnly(file)
-            }
+            atomicReplace(json.encodeToString(updated.values))
         }
+    }
+
+    private fun atomicReplace(content: String) {
+        val tmp = File(file.path + ".tmp")
+        tmp.writeText(content)
+        setOwnerOnly(tmp)
+        if (!tmp.renameTo(file)) {
+            // Rename failed: fallback — back up the existing file, then copy over
+            if (file.exists()) {
+                file.renameTo(File(file.path + ".bak"))
+            }
+            file.writeText(tmp.readText())
+            tmp.delete()
+        }
+        setOwnerOnly(file)
     }
 
     /** Restricts a file to owner read/write (0600) since it contains access tokens */

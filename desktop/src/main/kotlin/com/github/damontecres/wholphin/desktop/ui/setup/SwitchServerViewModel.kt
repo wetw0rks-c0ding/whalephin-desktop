@@ -107,22 +107,24 @@ class SwitchServerViewModel(
         }
     }
 
+    // Cache API clients per server URL to avoid creating a new one on every check
+    private val apiClientCache = mutableMapOf<String, org.jellyfin.sdk.api.client.ApiClient>()
+
     private suspend fun internalTestServer(server: JellyfinServer): ServerConnectionStatus {
+        val client = apiClientCache.getOrPut(server.url) {
+            jellyfin.createApi(
+                server.url,
+                httpClientOptions =
+                    HttpClientOptions(
+                        requestTimeout = 6.seconds,
+                        connectTimeout = 6.seconds,
+                        socketTimeout = 6.seconds,
+                    ),
+            )
+        }
         val result =
             try {
-                val systemInfo =
-                    jellyfin
-                        .createApi(
-                            server.url,
-                            httpClientOptions =
-                                HttpClientOptions(
-                                    requestTimeout = 6.seconds,
-                                    connectTimeout = 6.seconds,
-                                    socketTimeout = 6.seconds,
-                                ),
-                        ).systemApi
-                        .getPublicSystemInfo()
-                        .content
+                val systemInfo = client.systemApi.getPublicSystemInfo().content
                 ServerConnectionStatus.Success(systemInfo)
             } catch (ex: Exception) {
                 Log.w(ex, "Error checking server ${server.url}")
@@ -223,20 +225,16 @@ class SwitchServerViewModel(
     fun discoverServers() {
         viewModelScope.launchIO {
             jellyfin.discovery.discoverLocalServers().collect { server ->
-                val jellyfinServer =
-                    JellyfinServer(
-                        server.id.toUUID(),
-                        server.name,
-                        server.address,
-                        null,
-                    )
+                val id = server.id.toUUIDOrNull() ?: return@collect
                 _state.update {
                     it.copy(
                         discoveredServers =
                             it.discoveredServers
                                 .toMutableList()
-                                .apply {
-                                    add(jellyfinServer)
+                                .also { list ->
+                                    if (list.none { existing -> existing.id == id }) {
+                                        list.add(JellyfinServer(id, server.name, server.address, null))
+                                    }
                                 },
                     )
                 }

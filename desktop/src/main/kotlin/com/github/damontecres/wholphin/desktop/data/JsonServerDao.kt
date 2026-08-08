@@ -104,8 +104,9 @@ class JsonServerDao(
                 } else {
                     current.users + updated
                 }
-            _fileState.value = current.copy(users = users)
-            save(_fileState.value)
+            val newState = current.copy(users = users)
+            save(newState)
+            _fileState.value = newState
             updated
         }
 
@@ -163,8 +164,9 @@ class JsonServerDao(
 
     private fun updateValue(transform: (ServersFile) -> ServersFile) {
         synchronized(lock) {
-            _fileState.value = _fileState.value.let(transform)
-            save(_fileState.value)
+            val newState = _fileState.value.let(transform)
+            save(newState)
+            _fileState.value = newState
         }
     }
 }

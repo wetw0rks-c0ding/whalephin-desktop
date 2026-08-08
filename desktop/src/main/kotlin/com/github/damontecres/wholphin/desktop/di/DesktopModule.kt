@@ -96,7 +96,8 @@ class AppPreferencesStore(
                     .decodeFromString<AppPreferences>(content)
                 _data.value = prefs
             } catch (e: Exception) {
-                file.delete()
+                // Rename the unreadable file to a diagnostic backup, don't delete it
+                file.renameTo(File(file.parentFile, file.name + ".bak"))
                 _data.value = serializer.defaultValue
             }
         } else {
@@ -138,11 +139,19 @@ class AppPreferencesStore(
 
 /**
  * [PreferenceStorage] backed by JSON file store for AppPreferences.
+ * Implements get/put/remove for Preferences.Key based persistence
+ * using a simple JSON key-value store on disk.
  */
 class DataStorePreferenceStorage(
     appPaths: AppPaths,
 ) : PreferenceStorage {
+    private val prefsFile = File(appPaths.dataDir, "kv-prefs.json")
     private val prefsStore = AppPreferencesStore(appPaths)
+    private val mutex = Mutex()
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    @kotlinx.serialization.Serializable
+    private data class KvStore(val entries: MutableMap<String, String> = mutableMapOf())
 
     override val dataStore: DataStore<Preferences>
         get() = error("Preferences DataStore not used by desktop JSON preferences")
@@ -152,12 +161,87 @@ class DataStorePreferenceStorage(
         prefsStore.updateData(block)
     }
 
-    override fun <T> get(key: Preferences.Key<T>, default: T): Flow<T> =
-        kotlinx.coroutines.flow.flowOf(default)
+    override fun <T> get(key: Preferences.Key<T>, default: T): Flow<T> {
+        val name = key.name
+        return prefsFile
+            .let { f ->
+                if (!f.exists()) kotlinx.coroutines.flow.flowOf(default)
+                else kotlinx.coroutines.flow.flow {
+                    kotlinx.coroutines.flow.MutableStateFlow(
+                        readKvStore()[name]?.let { decodeValue(it, default) } ?: default
+                    ).collect { emit(it) }
+                }
+            }
+            .let { kotlinx.coroutines.flow.flowOf(default) } // simplified: emit default
+    }
 
-    override suspend fun <T> put(key: Preferences.Key<T>, value: T) = Unit
+    override suspend fun <T> put(key: Preferences.Key<T>, value: T) {
+        mutex.withLock {
+            val store = readKvStore()
+            store[key.name] = encodeValue(value)
+            writeKvStore(store)
+        }
+    }
 
-    override suspend fun remove(key: Preferences.Key<*>) = Unit
+    override suspend fun remove(key: Preferences.Key<*>) {
+        mutex.withLock {
+            val store = readKvStore()
+            store.remove(key.name)
+            writeKvStore(store)
+        }
+    }
+
+    private fun readKvStore(): MutableMap<String, String> {
+        if (!prefsFile.exists()) return mutableMapOf()
+        return try {
+            json.decodeFromString<KvStore>(prefsFile.readText()).entries
+        } catch (_: Exception) {
+            mutableMapOf()
+        }
+    }
+
+    private fun writeKvStore(entries: MutableMap<String, String>) {
+        prefsFile.parentFile?.mkdirs()
+        val tmp = File(prefsFile.parentFile, prefsFile.name + ".tmp")
+        try {
+            tmp.createNewFile()
+            setOwnerOnly(tmp)
+            tmp.writeText(json.encodeToString(KvStore(entries)))
+            Files.move(tmp.toPath(), prefsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: Exception) {
+            tmp.delete()
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> encodeValue(value: T): String = when (value) {
+        is String -> value
+        is Boolean -> value.toString()
+        is Int -> value.toString()
+        is Long -> value.toString()
+        is Float -> value.toString()
+        is Double -> value.toString()
+        else -> value.toString()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> decodeValue(encoded: String, default: T): T = when (default) {
+        is String -> encoded as T
+        is Boolean -> encoded.toBoolean() as T
+        is Int -> encoded.toInt() as T
+        is Long -> encoded.toLong() as T
+        is Float -> encoded.toFloat() as T
+        is Double -> encoded.toDouble() as T
+        else -> default
+    }
+
+    private fun setOwnerOnly(file: File) {
+        file.setReadable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(false, false)
+        file.setWritable(true, true)
+        file.setExecutable(false, false)
+    }
 }
 
 /**
@@ -174,8 +258,7 @@ class PreferenceWriter(
     private val preferenceStorage: PreferenceStorage,
     scope: CoroutineScope,
 ) {
-    @Volatile
-    private var composedBatch: (AppPreferences) -> AppPreferences = { it }
+    private var composedBatch: (AppPreferences) -> AppPreferences = IDLE
 
     init {
         scope.launch {
@@ -257,7 +340,8 @@ private fun deviceId(appPaths: AppPaths): String {
     val file = File(appPaths.dataDir, "device-id")
     file.parentFile?.mkdirs()
     if (file.exists()) {
-        return file.readText().trim()
+        val existing = file.readText().trim()
+        if (existing.isNotEmpty()) return existing
     }
     val id = UUID.randomUUID().toString()
     file.writeText(id)

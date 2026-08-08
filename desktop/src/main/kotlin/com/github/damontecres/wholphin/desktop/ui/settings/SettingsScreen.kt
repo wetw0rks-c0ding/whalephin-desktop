@@ -38,9 +38,14 @@ fun SettingsPage(
     }
 
     // Sync asynchronously-loaded persisted values back into local state,
-    // replacing the default once the store has actually emitted.
+    // replacing the default only on first non-default emission. After that, the
+    // local snapshot drives the UI to avoid overwriting pending edits.
+    var synced by remember { mutableStateOf(false) }
     LaunchedEffect(storedPrefs) {
-        appPrefs = storedPrefs
+        if (!synced && storedPrefs != AppPreferences()) {
+            synced = true
+            appPrefs = storedPrefs
+        }
     }
 
     val sections = listOf(

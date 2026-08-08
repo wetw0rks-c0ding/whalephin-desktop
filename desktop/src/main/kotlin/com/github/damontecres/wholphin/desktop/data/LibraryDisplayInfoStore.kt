@@ -58,6 +58,10 @@ class LibraryDisplayInfoStore(
         setOwnerOnly(tmp)
         tmp.writeText(json.encodeToString(data))
         if (!tmp.renameTo(file)) {
+            // Preserve the original as a backup before overwriting
+            if (file.exists()) {
+                file.renameTo(File(file.parentFile, file.name + ".bak"))
+            }
             file.writeText(tmp.readText())
             tmp.delete()
         }

@@ -21,6 +21,12 @@ class BackgroundTaskScheduler(
     private val shouldRun: suspend () -> Boolean = { true },
     private val task: suspend () -> Unit,
 ) {
+    init {
+        require(interval > Duration.ZERO) {
+            "interval must be positive, was $interval"
+        }
+    }
+
     private var job: Job? = null
 
     fun start() {
@@ -31,6 +37,8 @@ class BackgroundTaskScheduler(
                 if (shouldRun()) {
                     try {
                         task()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e // preserve cancellation
                     } catch (_: Exception) {
                         // Logged upstream; continue the loop.
                     }

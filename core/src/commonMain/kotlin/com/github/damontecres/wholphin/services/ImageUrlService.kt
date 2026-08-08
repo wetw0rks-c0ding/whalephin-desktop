@@ -95,8 +95,10 @@ class ImageUrlService(
         fillWidth: Int? = null,
         fillHeight: Int? = null,
         useSeriesForPrimary: Boolean? = null,
-    ): String? =
-        if (item != null) {
+    ): String? {
+        // Honour any explicit override set by the caller
+        item?.imageUrlOverride?.let { return it }
+        return if (item != null) {
             getItemImageUrl(
                 itemId = item.id,
                 itemType = item.type,
@@ -113,6 +115,7 @@ class ImageUrlService(
         } else {
             null
         }
+    }
 
     fun getItemImageUrl(
         itemId: UUID,

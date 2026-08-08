@@ -96,31 +96,40 @@ class ServerRepository(
                 throw IllegalStateException("User is not part of the server")
             }
             Log.v("Changing user to ${user.name} on ${server.url}")
+            // Save previous client state in case validation fails
+            val previousBaseUrl = apiClient.baseUrl
+            val previousToken = apiClient.accessToken
             apiClient.update(baseUrl = server.url, accessToken = user.accessToken)
-            val userDto by apiClient.userApi.getCurrentUser()
-            val updatedServer =
-                try {
-                    val sysInfo by apiClient.systemApi.getPublicSystemInfo()
-                    server.copy(name = sysInfo.serverName, version = sysInfo.version)
-                } catch (ex: Exception) {
-                    Log.w(ex, "Exception fetching public system info")
-                    server
+            try {
+                val userDto by apiClient.userApi.getCurrentUser()
+                val updatedServer =
+                    try {
+                        val sysInfo by apiClient.systemApi.getPublicSystemInfo()
+                        server.copy(name = sysInfo.serverName, version = sysInfo.version)
+                    } catch (ex: Exception) {
+                        Log.w(ex, "Exception fetching public system info")
+                        server
+                    }
+                var updatedUser =
+                    user.copy(
+                        id = userDto.id,
+                        name = userDto.name,
+                    )
+                serverDao.addOrUpdateServer(updatedServer)
+                updatedUser = serverDao.addOrUpdateUser(updatedUser)
+                preferenceStorage.put(CURRENT_SERVER_ID_KEY, updatedServer.id.toServerString())
+                preferenceStorage.put(CURRENT_USER_ID_KEY, updatedUser.id.toServerString())
+                val currentUser = CurrentUser(updatedServer, updatedUser)
+                withContext(WholphinDispatchers.Main) {
+                    _current.value = currentUser
+                    _currentUserDto.value = userDto
                 }
-            var updatedUser =
-                user.copy(
-                    id = userDto.id,
-                    name = userDto.name,
-                )
-            serverDao.addOrUpdateServer(updatedServer)
-            updatedUser = serverDao.addOrUpdateUser(updatedUser)
-            preferenceStorage.put(CURRENT_SERVER_ID_KEY, updatedServer.id.toServerString())
-            preferenceStorage.put(CURRENT_USER_ID_KEY, updatedUser.id.toServerString())
-            val currentUser = CurrentUser(updatedServer, updatedUser)
-            withContext(WholphinDispatchers.Main) {
-                _current.value = currentUser
-                _currentUserDto.value = userDto
+                return@withContext currentUser
+            } catch (ex: Exception) {
+                // Restore previous credentials so existing sessions aren't lost
+                apiClient.update(baseUrl = previousBaseUrl, accessToken = previousToken)
+                throw ex
             }
-            return@withContext currentUser
         }
 
     /**
@@ -152,6 +161,13 @@ class ServerRepository(
             } else {
                 val user = serverAndUsers.users.firstOrNull { it.id == userId }
                 if (user != null) {
+                    // Don't bypass PIN — restoring a PIN-protected user requires
+                    // explicit PIN entry, so return the current user for the UI
+                    // to handle authentication before calling changeUser.
+                    if (user.pin != null) {
+                        _current.value = CurrentUser(serverAndUsers.server, user)
+                        return null
+                    }
                     return changeUser(serverAndUsers.server, user)
                 }
             }

@@ -42,7 +42,7 @@ fun SearchPage(
     modifier: Modifier = Modifier,
 ) {
     val api = koinInject<ApiClient>()
-    val viewModel = remember { SearchViewModel(api) }
+    val viewModel = remember(initialQuery) { SearchViewModel(api) }
     DisposableEffect(viewModel) {
         onDispose { viewModel.clear() }
     }

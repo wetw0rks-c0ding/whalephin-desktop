@@ -77,44 +77,56 @@ fun MainContent(
             }
     }
 
+    val isFullScreen = currentDestination?.fullScreen == true
     CompositionLocalProvider(LocalImageUrlService provides imageUrlService) {
         Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                Surface(modifier = Modifier.width(280.dp).fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                    NavDrawer(
-                        libraries = librariesState,
-                        selectedIndex = selectedIndex,
-                        user = current?.user?.name.orEmpty(),
-                        server = current?.server?.name.orEmpty(),
-                        onHome = { navigationManager.goToHome() },
-                        onSearch = { navigationManager.navigateToFromDrawer(Destination.Search()) },
-                        onFavorites = { navigationManager.navigateToFromDrawer(Destination.Favorites) },
-                        onSettings = { navigationManager.navigateToFromDrawer(Destination.Settings) },
-                        onLibrary = { index ->
-                            val library = librariesState.getOrNull(index) ?: return@NavDrawer
-                            navigationManager.navigateToFromDrawer(
-                                Destination.MediaItem(
-                                    itemId = library.id,
-                                    type = org.jellyfin.sdk.model.api.BaseItemKind.COLLECTION_FOLDER,
-                                    collectionType = library.collectionType,
-                                ),
-                            )
-                        },
-                        onSignOut = {
-                            scope.launchDefault {
-                                current?.user?.let { serverRepository.removeUser(it) }
-                            }
-                        },
-                    )
-                }
+            if (isFullScreen) {
                 DestinationContent(
                     destination = navigationManager.backStack.last(),
                     onBack = { navigationManager.goBack() },
                     onItemClick = { item -> navigationManager.navigateTo(item.toDestination()) },
-                    onPlay = { /* Playback arrives in M4 */ },
+                    onPlay = { /* Wired via PlaybackDestination */ },
                     onViewMore = { row, title -> navigationManager.navigateTo(Destination.MoreHomeRow(title, row, 0)) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                 )
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Surface(modifier = Modifier.width(280.dp).fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                        NavDrawer(
+                            libraries = librariesState,
+                            selectedIndex = selectedIndex,
+                            user = current?.user?.name.orEmpty(),
+                            server = current?.server?.name.orEmpty(),
+                            onHome = { navigationManager.goToHome() },
+                            onSearch = { navigationManager.navigateToFromDrawer(Destination.Search()) },
+                            onFavorites = { navigationManager.navigateToFromDrawer(Destination.Favorites) },
+                            onSettings = { navigationManager.navigateToFromDrawer(Destination.Settings) },
+                            onLibrary = { index ->
+                                val library = librariesState.getOrNull(index) ?: return@NavDrawer
+                                navigationManager.navigateToFromDrawer(
+                                    Destination.MediaItem(
+                                        itemId = library.id,
+                                        type = org.jellyfin.sdk.model.api.BaseItemKind.COLLECTION_FOLDER,
+                                        collectionType = library.collectionType,
+                                    ),
+                                )
+                            },
+                            onSignOut = {
+                                scope.launchDefault {
+                                    current?.user?.let { serverRepository.removeUser(it) }
+                                }
+                            },
+                        )
+                    }
+                    DestinationContent(
+                        destination = navigationManager.backStack.last(),
+                        onBack = { navigationManager.goBack() },
+                        onItemClick = { item -> navigationManager.navigateTo(item.toDestination()) },
+                        onPlay = { /* Wired via PlaybackDestination */ },
+                        onViewMore = { row, title -> navigationManager.navigateTo(Destination.MoreHomeRow(title, row, 0)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
