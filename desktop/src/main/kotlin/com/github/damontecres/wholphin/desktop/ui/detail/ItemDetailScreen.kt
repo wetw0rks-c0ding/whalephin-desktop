@@ -167,10 +167,10 @@ fun ItemDetailScreen(
     when (val loading = state.loadingState) {
         LoadingState.Pending,
         LoadingState.Loading,
-        -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        -> Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 
         is LoadingState.Error ->
-            Column(modifier = Modifier.fillMaxSize().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = modifier.fillMaxSize().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Unable to load item", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text(loading.localizedMessage, style = MaterialTheme.typography.bodyMedium)
@@ -179,7 +179,7 @@ fun ItemDetailScreen(
         LoadingState.Success -> {
             val item = state.item
             if (item == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Item not found") }
+                Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Item not found") }
             } else {
                 Column(
                     modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
