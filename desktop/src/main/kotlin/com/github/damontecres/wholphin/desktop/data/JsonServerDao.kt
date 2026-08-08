@@ -33,6 +33,10 @@ class JsonServerDao(
     /** Guards read-modify-write transitions; the DAO interface is non-suspend so [synchronized] is used. */
     private val lock = Any()
 
+    /** When true, persistence is blocked because the backing file could not be recovered. */
+    @Volatile
+    private var persistBlocked = false
+
     private val _fileState = MutableStateFlow(load())
     private val fileState: Flow<ServersFile> = _fileState
 
@@ -45,13 +49,19 @@ class JsonServerDao(
             Log.e(ex, "Error loading ${file.path}; preserving file and starting fresh")
             val bak = File(file.parentFile, file.name + ".${System.currentTimeMillis()}.bak")
             if (!file.renameTo(bak)) {
-                Log.e("Failed to rename ${file.path} to backup; will not persist to avoid overwriting")
+                Log.e("Failed to rename ${file.path} to backup; blocking persistence until manually recovered")
+                persistBlocked = true
             }
             ServersFile()
         }
     }
 
     private fun save(data: ServersFile) {
+        if (persistBlocked) {
+            Log.e("Persistence blocked: corrupt ${file.path} could not be backed up. " +
+                "Manually move or delete the file to restore writes.")
+            return
+        }
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
         // Restrict permissions before writing so tokens never sit in a world-readable file
