@@ -3,7 +3,6 @@ package com.github.damontecres.wholphin.desktop.preferences
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.Serializer
 import com.github.damontecres.wholphin.preferences.AppPreferences
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -27,7 +26,7 @@ class AppPreferencesSerializer : Serializer<AppPreferences> {
         val content = reader.readText()
         return try {
             json.decodeFromString<AppPreferences>(content)
-        } catch (e: SerializationException) {
+        } catch (e: IllegalArgumentException) {
             throw CorruptionException("Cannot parse AppPreferences JSON", e)
         }
     }

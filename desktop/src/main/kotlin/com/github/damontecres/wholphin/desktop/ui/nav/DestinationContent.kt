@@ -46,7 +46,7 @@ fun DestinationContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        if (destination !is Destination.Home && destination !is Destination.Search) {
+        if (destination !is Destination.Home && destination !is Destination.Search && destination !is Destination.Playback) {
             Row(
                 modifier = Modifier.padding(start = 8.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
