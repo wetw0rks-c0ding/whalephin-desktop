@@ -74,9 +74,17 @@ fun WholphinApp() {
                     PinEntryContent(
                         current = destination.current,
                         onSuccess = {
-                            // Authenticate the user before transitioning to app content
-                            scope.launch { repo.changeUser(destination.current.server, destination.current.user) }
-                            navigationManager.navigateTo(SetupDestination.AppContent(destination.current))
+                            // Authenticate the user before transitioning to app content.
+                            // Navigate only after changeUser succeeds.
+                            scope.launch {
+                                try {
+                                    repo.changeUser(destination.current.server, destination.current.user)
+                                    navigationManager.navigateTo(SetupDestination.AppContent(destination.current))
+                                } catch (e: Exception) {
+                                    // Authentication failed — stay on PIN screen, surface error
+                                    Log.e(e, "PIN auth failed for ${destination.current.user.name}")
+                                }
+                            }
                         },
                         onCancel = {
                             navigationManager.navigateTo(SetupDestination.ServerList)

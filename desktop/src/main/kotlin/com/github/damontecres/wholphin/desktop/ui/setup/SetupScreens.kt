@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -53,6 +55,7 @@ import com.github.damontecres.wholphin.data.model.CurrentUser
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
 import com.github.damontecres.wholphin.desktop.util.checkPin
+import com.github.damontecres.wholphin.desktop.util.pinLengthFromHash
 import com.github.damontecres.wholphin.desktop.services.SetupDestination
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.desktop.util.DesktopViewModel
@@ -276,7 +279,7 @@ fun UserListContent(
         if (state.loading is LoadingState.Loading || state.loading is LoadingState.Pending) {
             CircularProgressIndicator()
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(state.users, key = { it.user.id }) { userAndImage ->
                     UserRow(
                         user = userAndImage.user,
@@ -416,11 +419,15 @@ fun PinEntryContent(
     onCancel: () -> Unit,
 ) {
     var entered by remember { mutableStateOf("") }
-    val pinLength = current.user.pin?.length ?: 4
+    val pinLength = pinLengthFromHash(current.user.pin)
     var error by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp)
+            .focusRequester(focusRequester)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp) {
                     val char = event.utf16CodePoint.toChar()

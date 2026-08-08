@@ -37,7 +37,7 @@ class LatestNextUpService(
 
     suspend fun updateRemovedFromNextUp(userId: UUID) {
         // Collect pairs that may need removal from an initial read
-        val candidates = mutableSetOf<UUID>()
+        val candidates = mutableMapOf<UUID, LocalDateTime>()
         getRemovedFromNextUp(userId).forEach { (seriesId, timestamp) ->
             val item =
                 api.itemsApi
@@ -54,15 +54,15 @@ class LatestNextUpService(
             if (item != null) {
                 val lastPlayed = item.userData?.lastPlayedDate
                 if (lastPlayed != null && lastPlayed > timestamp) {
-                    candidates.add(seriesId)
+                    candidates[seriesId] = timestamp
                 }
             } else {
-                candidates.add(seriesId)
+                candidates[seriesId] = timestamp
             }
         }
         if (candidates.isEmpty()) return
         // Inside the update lock, re-read the current value and only
-        // remove entries that are still present.
+        // remove entries whose stored timestamp still matches what we observed.
         displayPreferencesService.updateDisplayPreferences(userId) {
             val current =
                 get(REMOVED_KEY)
@@ -70,7 +70,11 @@ class LatestNextUpService(
                     .orEmpty()
                     .toMutableMap()
             if (current.isEmpty()) return@updateDisplayPreferences
-            current.keys.removeAll(candidates)
+            candidates.forEach { (seriesId, observedTimestamp) ->
+                if (current[seriesId] == observedTimestamp) {
+                    current.remove(seriesId)
+                }
+            }
             put(REMOVED_KEY, Json.encodeToString(RemovedSeriesIds(current)))
         }
     }
