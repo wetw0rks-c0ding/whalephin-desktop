@@ -12,6 +12,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
@@ -42,25 +45,20 @@ class JsonServerDao(
 
     private fun load(): ServersFile {
         if (!file.exists()) {
-            // Try to recover from a backup or tmp left behind by an interrupted save
-            val bakFile = file.parentFile?.listFiles()?.findLast {
-                it.name.startsWith(file.name + ".") && (it.name.endsWith(".bak") || it.name.endsWith(".tmp"))
-            }
-            if (bakFile != null && bakFile.exists()) {
+            // Try to recover from a backup left behind by a crash during save.
+            // Only consider .bak files (tmp files are incomplete by definition); pick the newest.
+            val parent = file.parentFile ?: return ServersFile()
+            val bakFiles = parent.listFiles { f ->
+                f.isFile && f.name.startsWith(file.name + ".") && f.name.endsWith(".bak")
+            }?.sortedByDescending { it.lastModified() }.orEmpty()
+            if (bakFiles.isNotEmpty()) {
                 return try {
-                    val data = Json { ignoreUnknownKeys = true }.decodeFromString<ServersFile>(bakFile.readText())
-                    // Restore from the backup: write it back as the primary
-                    Log.w("Recovered ${file.path} from backup ${bakFile.name}")
-                    file.parentFile?.mkdirs()
-                    val tmp = File(file.parentFile, file.name + ".tmp")
-                    tmp.createNewFile()
-                    setOwnerOnly(tmp)
-                    tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
-                    if (!tmp.renameTo(file)) {
-                        file.createNewFile()
-                        setOwnerOnly(file)
-                        file.writeText(tmp.readText())
-                        tmp.delete()
+                    val bak = bakFiles.first()
+                    val data = Json { ignoreUnknownKeys = true }.decodeFromString<ServersFile>(bak.readText())
+                    Log.w("Recovered ${file.path} from backup ${bak.name}")
+                    // Write recovery as the primary, using atomic move if possible
+                    if (!writePrimaryAtomically(data)) {
+                        Log.e("Failed to write recovered state to ${file.path}")
                     }
                     data
                 } catch (_: Exception) {
@@ -83,6 +81,27 @@ class JsonServerDao(
         }
     }
 
+    /**
+     * Attempts an atomic move of tmp → primary file. Falls back to rename.
+     * Returns true if the primary file was successfully written.
+     */
+    private fun writePrimaryAtomically(data: ServersFile): Boolean {
+        file.parentFile?.mkdirs()
+        val tmpPath = File(file.parentFile, file.name + ".tmp").toPath()
+        try {
+            Files.writeString(tmpPath, Json { prettyPrint = true }.encodeToString(data))
+            setOwnerOnly(tmpPath.toFile())
+            Files.move(tmpPath, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            return true
+        } catch (_: Exception) {
+            // Atomic move failed — fall back to direct write
+            setOwnerOnly(file)
+            file.writeText(Json { prettyPrint = true }.encodeToString(data))
+            try { Files.deleteIfExists(tmpPath) } catch (_: IOException) {}
+            return true
+        }
+    }
+
     private fun save(data: ServersFile): Boolean {
         if (persistBlocked) {
             Log.e("Persistence blocked: corrupt ${file.path} could not be backed up. " +
@@ -91,18 +110,27 @@ class JsonServerDao(
         }
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
-        // Restrict permissions before writing so tokens never sit in a world-readable file
         tmp.createNewFile()
         setOwnerOnly(tmp)
         tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
-        if (!tmp.renameTo(file)) {
-            // Rename failed: keep a backup of the old file, then copy the tmp content over
+        try {
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: Exception) {
+            // Atomic move not supported — try backup-then-copy
             if (file.exists()) {
-                file.renameTo(File(file.parentFile, file.name + ".bak"))
+                val bak = File(file.parentFile, file.name + ".bak")
+                if (!file.renameTo(bak)) {
+                    Log.e("Failed to back up ${file.path} before save; keeping tmp for recovery")
+                    return false
+                }
             }
-            file.createNewFile()
-            setOwnerOnly(file)
-            file.writeText(tmp.readText())
+            try {
+                Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: Exception) {
+                Log.e("Failed to write new state to ${file.path}")
+                return false
+            }
+        } finally {
             tmp.delete()
         }
         return true
@@ -148,6 +176,8 @@ class JsonServerDao(
             val newState = current.copy(users = users)
             if (save(newState)) {
                 _fileState.value = newState
+            } else {
+                throw IOException("Failed to persist user ${updated.id}; save to ${file.path} failed")
             }
             updated
         }
@@ -209,6 +239,8 @@ class JsonServerDao(
             val newState = _fileState.value.let(transform)
             if (save(newState)) {
                 _fileState.value = newState
+            } else {
+                throw IOException("Failed to persist state to ${file.path}; in-memory state matches last successful save")
             }
         }
     }
