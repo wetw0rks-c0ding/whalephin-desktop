@@ -17,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.rememberCoroutineScope
 import coil3.ImageLoader
+import kotlinx.coroutines.launch
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
@@ -50,6 +52,8 @@ fun WholphinApp() {
     MaterialTheme(colorScheme = DarkColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val navigationManager = koinInject<SetupNavigationManager>()
+            val repo = koinInject<ServerRepository>()
+            val scope = rememberCoroutineScope()
             val destination = navigationManager.backStack.firstOrNull() ?: SetupDestination.Loading
             when (destination) {
                 SetupDestination.Loading -> StartupScreen(navigationManager)
@@ -70,6 +74,8 @@ fun WholphinApp() {
                     PinEntryContent(
                         current = destination.current,
                         onSuccess = {
+                            // Authenticate the user before transitioning to app content
+                            scope.launch { repo.changeUser(destination.current.server, destination.current.user) }
                             navigationManager.navigateTo(SetupDestination.AppContent(destination.current))
                         },
                         onCancel = {

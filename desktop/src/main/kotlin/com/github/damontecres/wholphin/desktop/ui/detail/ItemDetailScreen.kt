@@ -69,25 +69,27 @@ class ItemDetailViewModel(
             try {
                 val dto = api.userLibraryApi.getItem(itemId = itemId).content
                 val item = dto?.let { BaseItem(it) }
-                val trailers =
-                    if (item != null) {
-                        trailerService.getRemoteTrailers(item) + trailerService.getLocalTrailers(item)
-                    } else {
-                        emptyList()
+                _state.update { it.copy(loadingState = LoadingState.Success, item = item) }
+                // Load trailers and extras independently — a failure in either
+                // leaves the item visible.
+                if (item != null) {
+                    try {
+                        _state.update {
+                            it.copy(
+                                trailers =
+                                    trailerService.getRemoteTrailers(item) + trailerService.getLocalTrailers(item),
+                            )
+                        }
+                    } catch (ex: kotlinx.coroutines.CancellationException) {
+                        throw ex
+                    } catch (_: Exception) {}
+                    if (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.SERIES) {
+                        try {
+                            _state.update { it.copy(extras = extrasService.getExtras(itemId)) }
+                        } catch (ex: kotlinx.coroutines.CancellationException) {
+                            throw ex
+                        } catch (_: Exception) {}
                     }
-                val extras =
-                    if (item != null && (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.SERIES)) {
-                        extrasService.getExtras(itemId)
-                    } else {
-                        emptyList()
-                    }
-                _state.update {
-                    it.copy(
-                        loadingState = LoadingState.Success,
-                        item = item,
-                        trailers = trailers,
-                        extras = extras,
-                    )
                 }
             } catch (ex: Exception) {
                 _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
@@ -97,24 +99,37 @@ class ItemDetailViewModel(
 
     fun setFavorite(item: BaseItem, favorite: Boolean) {
         viewModelScope.launchIO {
-            runCatching {
+            try {
                 api.itemsApi.updateItemUserData(
                     userId = null,
                     itemId = item.id,
                     data = UpdateUserItemDataDto(isFavorite = favorite),
                 )
+                // Refresh after successful mutation
+                val dto = api.userLibraryApi.getItem(itemId = itemId).content
+                dto?.let { _state.update { s -> s.copy(item = BaseItem(it)) } }
+            } catch (ex: kotlinx.coroutines.CancellationException) {
+                throw ex
+            } catch (ex: Exception) {
+                _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
             }
         }
     }
 
     fun setWatched(item: BaseItem, played: Boolean) {
         viewModelScope.launchIO {
-            runCatching {
+            try {
                 api.itemsApi.updateItemUserData(
                     userId = null,
                     itemId = item.id,
                     data = UpdateUserItemDataDto(played = played),
                 )
+                val dto = api.userLibraryApi.getItem(itemId = itemId).content
+                dto?.let { _state.update { s -> s.copy(item = BaseItem(it)) } }
+            } catch (ex: kotlinx.coroutines.CancellationException) {
+                throw ex
+            } catch (ex: Exception) {
+                _state.update { it.copy(loadingState = LoadingState.Error(exception = ex)) }
             }
         }
     }
@@ -234,7 +249,7 @@ fun ItemDetailScreen(
                             contentPadding = PaddingValues(horizontal = 24.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            items(trailers, key = { it.name }) { trailer ->
+                            items(trailers, key = { (it as? RemoteTrailer)?.url ?: "trailer-${it.hashCode()}" }) { trailer ->
                                 TrailerCard(trailer = trailer, modifier = Modifier.width(240.dp))
                             }
                         }
@@ -254,7 +269,7 @@ fun ItemDetailScreen(
                             contentPadding = PaddingValues(horizontal = 24.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            items(extras, key = { it.title }) { extra ->
+                            items(extras, key = { "${it.type}_${it.title}_${it.hashCode()}" }) { extra ->
                                 ExtraCard(extra = extra, modifier = Modifier.width(200.dp))
                             }
                         }

@@ -51,16 +51,20 @@ fun MainContent(
     var librariesState by remember { mutableStateOf(libraries.toList()) }
 
     LaunchedEffect(current?.server?.id, current?.user?.id) {
+        librariesState = emptyList()
         val user = current?.user ?: return@LaunchedEffect
         runCatching { homeSettingsService.getLibraries(user.id) }
             .onSuccess { librariesState = it }
-            .onFailure { Log.e(it, "Failed to load libraries for ${user.id}") }
+            .onFailure {
+                librariesState = emptyList()
+                Log.e(it, "Failed to load libraries for ${user.id}")
+            }
     }
 
     // Highlight the drawer entry matching the current destination.
     val currentDestination = navigationManager.backStack.lastOrNull()
     var selectedIndex by remember { mutableIntStateOf(-1) }
-    LaunchedEffect(currentDestination) {
+    LaunchedEffect(currentDestination, librariesState) {
         selectedIndex =
             when (currentDestination) {
                 is Destination.Home -> 0
@@ -85,7 +89,12 @@ fun MainContent(
                     destination = navigationManager.backStack.last(),
                     onBack = { navigationManager.goBack() },
                     onItemClick = { item -> navigationManager.navigateTo(item.toDestination()) },
-                    onPlay = { /* Wired via PlaybackDestination */ },
+                    onPlay = { item ->
+                        current?.let { cu ->
+                            val dest = Destination.Playback(item.id, item.type, item.resumeMs)
+                            navigationManager.navigateTo(dest)
+                        }
+                    },
                     onViewMore = { row, title -> navigationManager.navigateTo(Destination.MoreHomeRow(title, row, 0)) },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -122,7 +131,12 @@ fun MainContent(
                         destination = navigationManager.backStack.last(),
                         onBack = { navigationManager.goBack() },
                         onItemClick = { item -> navigationManager.navigateTo(item.toDestination()) },
-                        onPlay = { /* Wired via PlaybackDestination */ },
+                        onPlay = { item ->
+                        current?.let { cu ->
+                            val dest = Destination.Playback(item.id, item.type, item.resumeMs)
+                            navigationManager.navigateTo(dest)
+                        }
+                    },
                         onViewMore = { row, title -> navigationManager.navigateTo(Destination.MoreHomeRow(title, row, 0)) },
                         modifier = Modifier.weight(1f),
                     )

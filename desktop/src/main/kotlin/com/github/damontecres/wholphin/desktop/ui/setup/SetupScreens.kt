@@ -17,6 +17,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -46,6 +52,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.CurrentUser
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
+import com.github.damontecres.wholphin.desktop.util.checkPin
 import com.github.damontecres.wholphin.desktop.services.SetupDestination
 import com.github.damontecres.wholphin.desktop.services.SetupNavigationManager
 import com.github.damontecres.wholphin.desktop.util.DesktopViewModel
@@ -155,7 +162,7 @@ fun ServerListContent(
         if (state.loading is LoadingState.Loading || state.loading is LoadingState.Pending) {
             CircularProgressIndicator()
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(state.servers, key = { it.server.id }) { serverState ->
                     ServerRow(
                         server = serverState.server,
@@ -413,7 +420,17 @@ fun PinEntryContent(
     var error by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(32.dp)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp) {
+                    val char = event.utf16CodePoint.toChar()
+                    if (char.isDigit() && entered.length < pinLength) {
+                        entered += char.toString(); error = false; true
+                    } else if (event.key == Key.Backspace && entered.isNotEmpty()) {
+                        entered = entered.dropLast(1); error = false; true
+                    } else false
+                } else false
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -448,7 +465,8 @@ fun PinEntryContent(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = {
-                    if (entered == current.user.pin) {
+                    val storedPin = current.user.pin ?: ""
+                    if (checkPin(entered, storedPin)) {
                         onSuccess()
                     } else {
                         error = true

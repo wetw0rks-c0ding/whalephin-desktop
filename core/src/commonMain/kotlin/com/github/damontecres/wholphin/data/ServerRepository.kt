@@ -165,8 +165,9 @@ class ServerRepository(
                     // explicit PIN entry, so return the current user for the UI
                     // to handle authentication before calling changeUser.
                     if (user.pin != null) {
-                        _current.value = CurrentUser(serverAndUsers.server, user)
-                        return null
+                        val pending = CurrentUser(serverAndUsers.server, user)
+                        _current.value = pending
+                        return pending
                     }
                     return changeUser(serverAndUsers.server, user)
                 }
@@ -269,6 +270,8 @@ class ServerRepository(
     suspend fun switchServerOrUser() {
         preferenceStorage.remove(CURRENT_SERVER_ID_KEY)
         preferenceStorage.remove(CURRENT_USER_ID_KEY)
+        _current.value = null
+        _currentUserDto.value = null
     }
 
     suspend fun updateUserAuth(

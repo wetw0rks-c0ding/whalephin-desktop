@@ -110,6 +110,7 @@ private fun titleFor(destination: Destination): String =
         is Destination.FilteredCollection -> "Library"
         is Destination.MediaItem -> "Details"
         is Destination.MoreHomeRow -> destination.title
+        is Destination.Playback -> "Now Playing"
         is Destination.Settings -> "Settings"
         is Destination.Favorites -> "Favorites"
         else -> ""
