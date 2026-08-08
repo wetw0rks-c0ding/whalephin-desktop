@@ -39,11 +39,15 @@ fun pinLengthFromHash(stored: String?): Int =
 fun checkPin(entered: String, stored: String): Boolean {
     val parts = stored.split(":")
     if (parts.size != 4 || parts[0] != FORMAT_V1) {
-        // Fall back to legacy SHA-256 comparison
         return legacyCheck(entered, stored)
     }
-    val salt = parts[2].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    val expectedKey = parts[3].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    if (parts[2].length != SALT_BYTES * 2 || parts[3].length != DERIVED_KEY_BYTES * 2) {
+        return false
+    }
+    val salt = runCatching { parts[2].chunked(2).map { it.toInt(16).toByte() }.toByteArray() }
+        .getOrNull() ?: return false
+    val expectedKey = runCatching { parts[3].chunked(2).map { it.toInt(16).toByte() }.toByteArray() }
+        .getOrNull() ?: return false
     val enteredKey = derive(entered, salt)
     return MessageDigest.isEqual(enteredKey, expectedKey)
 }

@@ -81,8 +81,7 @@ fun WholphinApp() {
                                     repo.changeUser(destination.current.server, destination.current.user)
                                     navigationManager.navigateTo(SetupDestination.AppContent(destination.current))
                                 } catch (e: Exception) {
-                                    // Authentication failed — stay on PIN screen, surface error
-                                    Log.e(e, "PIN auth failed for ${destination.current.user.name}")
+                                    Log.e(e, "PIN auth failed")
                                 }
                             }
                         },

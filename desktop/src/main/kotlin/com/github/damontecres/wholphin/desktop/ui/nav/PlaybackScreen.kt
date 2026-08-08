@@ -26,6 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,12 +53,13 @@ fun PlaybackScreen(
     engine: MpvEngine = koinInject(),
 ) {
     val info by engine.info.collectAsState()
+    var dragPos by remember { mutableStateOf(0L) }
 
-    LaunchedEffect(itemId, type, initialPositionMs) {
+    LaunchedEffect(engine, itemId, type, initialPositionMs) {
         engine.play("", initialPositionMs)
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(engine) {
         onDispose { engine.stop() }
     }
 
@@ -66,9 +70,14 @@ fun PlaybackScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Seekbar
+            val displayPos = if (dragPos > 0) dragPos else info.positionMs.coerceIn(0L, info.durationMs.coerceAtLeast(1L))
             Slider(
-                value = info.positionMs.coerceIn(0L, info.durationMs.coerceAtLeast(1L)).toFloat(),
-                onValueChange = { engine.seek(it.toLong()) },
+                value = displayPos.toFloat(),
+                onValueChange = { v -> dragPos = v.toLong() },
+                onValueChangeFinished = {
+                    engine.seek(dragPos)
+                    dragPos = 0L
+                },
                 valueRange = 0f..info.durationMs.coerceAtLeast(1L).toFloat(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
