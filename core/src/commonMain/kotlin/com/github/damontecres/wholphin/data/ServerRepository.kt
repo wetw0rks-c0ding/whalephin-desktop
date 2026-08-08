@@ -81,6 +81,8 @@ class ServerRepository(
             serverDao.addOrUpdateServer(server)
         }
         apiClient.update(baseUrl = server.url, accessToken = null)
+        preferenceStorage.remove(CURRENT_USER_ID_KEY)
+        preferenceStorage.put(CURRENT_SERVER_ID_KEY, server.id.toServerString())
         _current.value = null
     }
 
@@ -95,7 +97,7 @@ class ServerRepository(
             if (server.id != user.serverId) {
                 throw IllegalStateException("User is not part of the server")
             }
-            Log.v("Changing user to ${user.name} on ${server.url}")
+            Log.v("Changing user to ${user.id} on server ${server.id}")
             // Save previous client state in case validation fails
             val previousBaseUrl = apiClient.baseUrl
             val previousToken = apiClient.accessToken
@@ -133,9 +135,10 @@ class ServerRepository(
         }
 
     /**
-     * Restores a session for the given server & user such as when the app reopens
+     * Restores a session for the given server & user such as when the app reopens.
      *
-     * If user has a PIN, this returns false
+     * Returns [CurrentUser] on success (may include PIN-protected users that
+     * require further authentication), or null if the server/user cannot be found.
      */
     suspend fun restoreSession(
         serverId: UUID?,
@@ -165,8 +168,11 @@ class ServerRepository(
                     // explicit PIN entry, so return the current user for the UI
                     // to handle authentication before calling changeUser.
                     if (user.pin != null) {
+                        // Don't bypass PIN — restoring a PIN-protected user requires
+                        // explicit PIN entry. Do NOT assign to _current; routing is
+                        // handled by App.kt's StartupScreen which collects the PIN
+                        // and calls changeUser only after authentication.
                         val pending = CurrentUser(serverAndUsers.server, user)
-                        _current.value = pending
                         return pending
                     }
                     return changeUser(serverAndUsers.server, user)
@@ -183,6 +189,7 @@ class ServerRepository(
 
     fun closeSession() {
         _current.value = null
+        _currentUserDto.value = null
     }
 
     /**
@@ -270,6 +277,7 @@ class ServerRepository(
     suspend fun switchServerOrUser() {
         preferenceStorage.remove(CURRENT_SERVER_ID_KEY)
         preferenceStorage.remove(CURRENT_USER_ID_KEY)
+        apiClient.update(baseUrl = null, accessToken = null)
         _current.value = null
         _currentUserDto.value = null
     }

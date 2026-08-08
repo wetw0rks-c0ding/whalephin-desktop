@@ -5,11 +5,12 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Logs uncaught coroutine exceptions. On Android [autoToast] additionally shows a toast;
- * on desktop it is a no-op (an in-app snackbar can be wired up later).
+ * Logs uncaught coroutine exceptions. The [autoToast] parameter is reserved for
+ * platform-specific notification wiring (Android toast / desktop snackbar);
+ * currently a no-op on all platforms until a notification channel is integrated.
  */
 class ExceptionHandler(
-    @Suppress("unused") private val autoToast: Boolean = false,
+    @Suppress("unused") autoToast: Boolean = false,
 ) : CoroutineExceptionHandler {
     override val key: CoroutineContext.Key<*> = CoroutineExceptionHandler
 

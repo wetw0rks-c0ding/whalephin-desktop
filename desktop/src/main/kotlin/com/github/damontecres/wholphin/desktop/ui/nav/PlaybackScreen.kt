@@ -107,7 +107,7 @@ fun PlaybackScreen(
             }
             // Time display
             Text(
-                formatTime(info.positionMs) + " / " + formatTime(info.durationMs),
+                formatTime(displayPos) + " / " + formatTime(info.durationMs),
                 color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodySmall,
             )
