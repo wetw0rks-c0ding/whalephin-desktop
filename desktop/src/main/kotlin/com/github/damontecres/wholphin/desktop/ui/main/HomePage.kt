@@ -68,13 +68,13 @@ fun HomePage(
         com.github.damontecres.wholphin.util.LoadingState.Pending,
         com.github.damontecres.wholphin.util.LoadingState.Loading,
         -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
 
         is com.github.damontecres.wholphin.util.LoadingState.Error -> {
-            Column(modifier = Modifier.fillMaxSize().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = modifier.fillMaxSize().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Unable to load home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text(loading.localizedMessage, style = MaterialTheme.typography.bodyMedium)

@@ -2,9 +2,12 @@ package com.github.damontecres.wholphin.services
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
 
 /**
@@ -27,29 +30,40 @@ class BackgroundTaskScheduler(
         }
     }
 
+    private val mutex = Mutex()
+
+    @Volatile
     private var job: Job? = null
 
     fun start() {
         if (job?.isActive == true) return
-        job = scope.launch {
-            delay(initialDelay)
-            while (isActive) {
-                if (shouldRun()) {
-                    try {
-                        task()
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e // preserve cancellation
-                    } catch (_: Exception) {
-                        // Logged upstream; continue the loop.
+        scope.launch {
+            mutex.withLock {
+                if (job?.isActive == true) return@launch
+                job = scope.launch {
+                    delay(initialDelay)
+                    while (isActive) {
+                        if (shouldRun()) {
+                            try {
+                                task()
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e // preserve cancellation
+                            } catch (_: Exception) {
+                                // Logged upstream; continue the loop.
+                            }
+                        }
+                        delay(interval)
                     }
                 }
-                delay(interval)
             }
         }
     }
 
-    fun stop() {
-        job?.cancel()
-        job = null
+    suspend fun stop() {
+        mutex.withLock {
+            val current = job
+            job = null
+            current?.cancelAndJoin()
+        }
     }
 }

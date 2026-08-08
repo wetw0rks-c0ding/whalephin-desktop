@@ -53,12 +53,14 @@ fun MainContent(
     LaunchedEffect(current?.server?.id, current?.user?.id) {
         librariesState = emptyList()
         val user = current?.user ?: return@LaunchedEffect
-        runCatching { homeSettingsService.getLibraries(user.id) }
-            .onSuccess { librariesState = it }
-            .onFailure {
-                librariesState = emptyList()
-                Log.e(it, "Failed to load libraries for ${user.id}")
-            }
+        try {
+            librariesState = homeSettingsService.getLibraries(user.id)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            librariesState = emptyList()
+            Log.e(e, "Failed to load libraries for ${user.id}")
+        }
     }
 
     // Highlight the drawer entry matching the current destination.

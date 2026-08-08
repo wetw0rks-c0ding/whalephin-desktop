@@ -3,6 +3,7 @@ package com.github.damontecres.wholphin.desktop.data
 import com.github.damontecres.wholphin.data.model.ItemPlayback
 import com.github.damontecres.wholphin.util.Log
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
@@ -28,8 +29,9 @@ class ItemPlaybackStore(
                 .getOrElse { ex ->
                     Log.e(ex, "Corrupt item playback store, backing up to .bak")
                     val bak = File(file.path + ".bak")
-                    setOwnerOnly(bak)
+                    bak.createNewFile()
                     file.copyTo(bak, overwrite = true)
+                    setOwnerOnly(bak)
                     emptyList()
                 }
                 .associateBy { it.itemId }
@@ -53,19 +55,15 @@ class ItemPlaybackStore(
 
     private fun atomicReplace(content: String) {
         val tmp = File(file.path + "." + System.currentTimeMillis() + ".tmp")
-        setOwnerOnly(tmp)
+        tmp.createNewFile()
         tmp.writeText(content)
+        setOwnerOnly(tmp)
         try {
             Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: Exception) {
-            // Atomic move not supported on this filesystem — fall back to backup-and-copy
-            if (file.exists()) {
-                val bak = File(file.path + ".bak")
-                setOwnerOnly(bak)
-                Files.move(file.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
+        } catch (_: AtomicMoveNotSupportedException) {
+            // Atomic move not supported on this filesystem — fall back to copy
             setOwnerOnly(file)
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            file.writeText(content)
         } finally {
             tmp.delete()
         }
