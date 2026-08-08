@@ -56,16 +56,16 @@ class ImageUrlService(
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
                     getItemImageUrl(parentBackdropId, ImageType.BACKDROP, fillWidth, fillHeight)
-                } else if (parentThumbId != null && itemType == BaseItemKind.SEASON && imageType !in imageTags) {
+                } else if (parentThumbId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
                     getItemImageUrl(parentThumbId, imageType, fillWidth, fillHeight)
                 } else if (useSeriesForPrimary &&
                     parentThumbId == null &&
                     itemType == BaseItemKind.EPISODE &&
-                    imageType !in imageTags
+                    imageTags[imageType] == null
                 ) {
                     // Fall back to episode image if no parent thumb
                     getItemImageUrl(itemId, ImageType.PRIMARY, fillWidth, fillHeight)
-                } else if (imageType !in imageTags && backdropTags.isNotEmpty()) {
+                } else if (imageTags[imageType] == null && backdropTags.isNotEmpty()) {
                     getItemImageUrl(itemId, ImageType.BACKDROP, fillWidth, fillHeight)
                 } else {
                     getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
@@ -79,7 +79,7 @@ class ImageUrlService(
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
                     getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
-                } else if (seriesId != null && itemType == BaseItemKind.SEASON && imageType !in imageTags) {
+                } else if (seriesId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
                     getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
                 } else {
                     getItemImageUrl(itemId, imageType, fillWidth, fillHeight)

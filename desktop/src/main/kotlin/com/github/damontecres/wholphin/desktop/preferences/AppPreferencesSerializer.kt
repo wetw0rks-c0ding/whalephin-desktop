@@ -1,8 +1,9 @@
 package com.github.damontecres.wholphin.desktop.preferences
 
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.Serializer
 import com.github.damontecres.wholphin.preferences.AppPreferences
-import com.github.damontecres.wholphin.util.Log
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -22,13 +23,12 @@ class AppPreferencesSerializer : Serializer<AppPreferences> {
     override val defaultValue: AppPreferences = AppPreferences()
 
     override suspend fun readFrom(input: InputStream): AppPreferences {
-        try {
-            val reader = InputStreamReader(input, StandardCharsets.UTF_8)
-            val content = reader.readText()
-            return json.decodeFromString<AppPreferences>(content)
-        } catch (e: Exception) {
-            Log.e(e, "Cannot read AppPreferences JSON, using defaults")
-            return defaultValue
+        val reader = InputStreamReader(input, StandardCharsets.UTF_8)
+        val content = reader.readText()
+        return try {
+            json.decodeFromString<AppPreferences>(content)
+        } catch (e: SerializationException) {
+            throw CorruptionException("Cannot parse AppPreferences JSON", e)
         }
     }
 

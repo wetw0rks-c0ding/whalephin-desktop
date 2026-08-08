@@ -108,10 +108,10 @@ class SwitchServerViewModel(
     }
 
     // Cache API clients per server URL to avoid creating a new one on every check
-    private val apiClientCache = mutableMapOf<String, org.jellyfin.sdk.api.client.ApiClient>()
+    private val apiClientCache = java.util.concurrent.ConcurrentHashMap<String, org.jellyfin.sdk.api.client.ApiClient>()
 
     private suspend fun internalTestServer(server: JellyfinServer): ServerConnectionStatus {
-        val client = apiClientCache.getOrPut(server.url) {
+        val client = apiClientCache.computeIfAbsent(server.url) {
             jellyfin.createApi(
                 server.url,
                 httpClientOptions =
