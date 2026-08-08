@@ -79,10 +79,10 @@ fun CollectionFolderScreen(
         when (val loading = state.loadingState) {
             LoadingState.Pending,
             LoadingState.Loading,
-            -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            -> Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 
             is LoadingState.Error ->
-                Box(modifier = Modifier.fillMaxSize().padding(48.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                     Text(loading.localizedMessage, style = MaterialTheme.typography.bodyMedium)
                 }
 
@@ -91,7 +91,7 @@ fun CollectionFolderScreen(
                     items = state.items,
                     viewOptions = state.viewOptions,
                     onItemClick = onItemClick,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
         }
     }
@@ -117,7 +117,8 @@ private fun SortMenu(
                     text = { Text(sort.readableName()) },
                     onClick = {
                         expanded = false
-                        onSortChange(SortAndDirection(sort, SortOrder.ASCENDING))
+                        val order = if (sort == currentSort.sort) currentSort.direction else currentSort.direction
+                        onSortChange(SortAndDirection(sort, order))
                     },
                 )
             }
