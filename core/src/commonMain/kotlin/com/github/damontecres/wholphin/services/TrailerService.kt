@@ -6,6 +6,7 @@ import com.github.damontecres.wholphin.data.model.RemoteTrailer
 import com.github.damontecres.wholphin.data.model.Trailer
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
+import java.net.URI
 
 /**
  * Gets trailers for media. Desktop port of the Android app's TrailerService
@@ -19,11 +20,7 @@ class TrailerService(
             ?.mapNotNull { t ->
                 t.url?.let { url ->
                     val name = t.name ?: "Trailer"
-                    val subtitle =
-                        when {
-                            url.contains("youtube.com") || url.contains("youtu.be") -> "YouTube"
-                            else -> null
-                        }
+                    val subtitle = classifyUrl(url)
                     RemoteTrailer(name, url, subtitle)
                 }
             }.orEmpty()
@@ -49,6 +46,15 @@ class TrailerService(
             }
         } else {
             emptyList()
+        }
+    }
+
+    companion object {
+        private val YOUTUBE_HOSTS = setOf("youtube.com", "www.youtube.com", "youtu.be")
+
+        private fun classifyUrl(url: String): String? {
+            val host = runCatching { URI(url).host?.lowercase() }.getOrNull() ?: return null
+            return if (host in YOUTUBE_HOSTS) "YouTube" else null
         }
     }
 }
