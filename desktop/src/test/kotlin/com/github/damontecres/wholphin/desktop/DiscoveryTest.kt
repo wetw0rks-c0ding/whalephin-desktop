@@ -5,10 +5,10 @@ import kotlinx.coroutines.runBlocking
 import org.jellyfin.sdk.discovery.RecommendedServerInfoScore
 import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.DeviceInfo
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Duration
-import kotlin.time.toKotlinDuration
 
 /**
  * Exercises the app's real server-discovery path (the same code `addServer`
@@ -16,9 +16,8 @@ import kotlin.time.toKotlinDuration
  */
 class DiscoveryTest {
     @Test
-    fun `discovers a real public server when given its full base URL`() = runBlocking(
-        timeout = Duration.ofSeconds(30).toKotlinDuration(),
-    ) {
+    fun `discovers a real public server when given its full base URL`() = runBlocking {
+        withTimeout(Duration.ofSeconds(30).toMillis()) {
         val factory =
             JellyfinClientFactory(
                 ClientInfo("Wholphin Test", "0.0.0-test"),
@@ -32,5 +31,6 @@ class DiscoveryTest {
             scores.any { it.score != RecommendedServerInfoScore.BAD },
             "No usable server discovered from a valid Jellyfin URL",
         )
+        }
     }
 }
