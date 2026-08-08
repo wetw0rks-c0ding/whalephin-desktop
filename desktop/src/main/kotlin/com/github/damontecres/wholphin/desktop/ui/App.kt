@@ -13,7 +13,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -52,6 +54,7 @@ fun WholphinApp() {
     MaterialTheme(colorScheme = DarkColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val navigationManager = koinInject<SetupNavigationManager>()
+            var authError by remember { mutableStateOf<String?>(null) }
             val repo = koinInject<ServerRepository>()
             val scope = rememberCoroutineScope()
             val destination = navigationManager.backStack.firstOrNull() ?: SetupDestination.Loading
@@ -73,6 +76,7 @@ fun WholphinApp() {
                 is SetupDestination.PinEntry -> {
                     PinEntryContent(
                         current = destination.current,
+                        authError = authError,
                         onSuccess = {
                             // Authenticate the user before transitioning to app content.
                             // Navigate only after changeUser succeeds.
@@ -84,6 +88,7 @@ fun WholphinApp() {
                                     throw e
                                 } catch (e: Exception) {
                                     Log.e(e, "PIN auth failed")
+                                    authError = "Authentication failed: ${e.message ?: "Unknown error"}"
                                 }
                             }
                         },

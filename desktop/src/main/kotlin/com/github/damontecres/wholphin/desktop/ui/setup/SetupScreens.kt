@@ -417,6 +417,7 @@ fun PinEntryContent(
     current: CurrentUser,
     onSuccess: () -> Unit,
     onCancel: () -> Unit,
+    authError: String? = null,
 ) {
     var entered by remember { mutableStateOf("") }
     val pinLength = pinLengthFromHash(current.user.pin)
@@ -443,6 +444,16 @@ fun PinEntryContent(
     ) {
         Text("Enter PIN for ${current.user.name}", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp))
+        authError?.let { msg ->
+            Text(
+                msg,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             repeat(pinLength) { index ->
                 Box(

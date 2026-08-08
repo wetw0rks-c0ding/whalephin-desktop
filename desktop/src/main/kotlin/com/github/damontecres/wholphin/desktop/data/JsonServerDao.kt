@@ -14,6 +14,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 
@@ -95,10 +97,18 @@ class JsonServerDao(
             return true
         } catch (_: Exception) {
             // Atomic move failed — fall back to direct write
-            setOwnerOnly(file)
-            file.writeText(Json { prettyPrint = true }.encodeToString(data))
-            try { Files.deleteIfExists(tmpPath) } catch (_: IOException) {}
-            return true
+            val target = file.toPath()
+            return try {
+                file.createNewFile()
+                setOwnerOnly(file)
+                Files.writeString(target, Json { prettyPrint = true }.encodeToString(data))
+                true
+            } catch (ex: Exception) {
+                Log.e(ex, "Failed to write recovered state to ${file.path}")
+                false
+            } finally {
+                try { Files.deleteIfExists(tmpPath) } catch (_: IOException) {}
+            }
         }
     }
 
@@ -115,6 +125,8 @@ class JsonServerDao(
         tmp.writeText(Json { prettyPrint = true }.encodeToString(data))
         try {
             Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            tmp.delete()
+            return true
         } catch (_: Exception) {
             // Atomic move not supported — try backup-then-copy
             if (file.exists()) {
@@ -124,25 +136,41 @@ class JsonServerDao(
                     return false
                 }
             }
-            try {
+            return try {
                 Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                tmp.delete()
+                true
             } catch (_: Exception) {
-                Log.e("Failed to write new state to ${file.path}")
-                return false
+                Log.e("Failed to write new state to ${file.path}; keeping ${tmp.path} for recovery")
+                false
             }
-        } finally {
-            tmp.delete()
         }
-        return true
     }
 
     /** Restricts a file to owner read/write (0600) since it contains access tokens */
     private fun setOwnerOnly(file: File) {
-        require(file.setReadable(false, false)) { "Failed to clear other-read on ${file.path}" }
-        require(file.setReadable(true, true)) { "Failed to set owner-read on ${file.path}" }
-        require(file.setWritable(false, false)) { "Failed to clear other-write on ${file.path}" }
-        require(file.setWritable(true, true)) { "Failed to set owner-write on ${file.path}" }
-        require(file.setExecutable(false, false)) { "Failed to clear execute on ${file.path}" }
+        val path = file.toPath()
+        val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java)
+        if (posix != null) {
+            try {
+                Files.setPosixFilePermissions(
+                    path,
+                    setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+                )
+            } catch (ex: IOException) {
+                Log.w(ex, "Failed to set POSIX permissions on ${file.path}")
+            }
+            return
+        }
+        // Non-POSIX filesystem: best-effort Java File API
+        val ok = file.setReadable(false, false) &&
+            file.setReadable(true, true) &&
+            file.setWritable(false, false) &&
+            file.setWritable(true, true) &&
+            file.setExecutable(false, false)
+        if (!ok) {
+            Log.w("Could not restrict permissions on ${file.path}; the file contains access tokens")
+        }
     }
 
     override fun addOrUpdateServer(server: JellyfinServer) {
