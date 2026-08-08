@@ -80,6 +80,8 @@ fun WholphinApp() {
                                 try {
                                     repo.changeUser(destination.current.server, destination.current.user)
                                     navigationManager.navigateTo(SetupDestination.AppContent(destination.current))
+                                } catch (e: CancellationException) {
+                                    throw e
                                 } catch (e: Exception) {
                                     Log.e(e, "PIN auth failed")
                                 }

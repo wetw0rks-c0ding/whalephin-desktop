@@ -43,7 +43,10 @@ class JsonServerDao(
         } catch (ex: Exception) {
             // Preserve the corrupt file for inspection instead of silently overwriting it on save
             Log.e(ex, "Error loading ${file.path}; preserving file and starting fresh")
-            file.renameTo(File(file.parentFile, file.name + ".bak"))
+            val bak = File(file.parentFile, file.name + ".${System.currentTimeMillis()}.bak")
+            if (!file.renameTo(bak)) {
+                Log.e("Failed to rename ${file.path} to backup; will not persist to avoid overwriting")
+            }
             ServersFile()
         }
     }
@@ -69,11 +72,11 @@ class JsonServerDao(
 
     /** Restricts a file to owner read/write (0600) since it contains access tokens */
     private fun setOwnerOnly(file: File) {
-        file.setReadable(false, false)
-        file.setReadable(true, true)
-        file.setWritable(false, false)
-        file.setWritable(true, true)
-        file.setExecutable(false, false)
+        require(file.setReadable(false, false)) { "Failed to clear other-read on ${file.path}" }
+        require(file.setReadable(true, true)) { "Failed to set owner-read on ${file.path}" }
+        require(file.setWritable(false, false)) { "Failed to clear other-write on ${file.path}" }
+        require(file.setWritable(true, true)) { "Failed to set owner-write on ${file.path}" }
+        require(file.setExecutable(false, false)) { "Failed to clear execute on ${file.path}" }
     }
 
     override fun addOrUpdateServer(server: JellyfinServer) {

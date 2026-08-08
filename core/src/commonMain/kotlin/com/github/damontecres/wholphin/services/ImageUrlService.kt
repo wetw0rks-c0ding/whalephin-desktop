@@ -27,21 +27,22 @@ class ImageUrlService(
         parentBackdropId: UUID? = null,
         fillWidth: Int? = null,
         fillHeight: Int? = null,
-    ): String? =
-        when (imageType) {
+    ): String? {
+        val selectedTag = imageTags[imageType]
+        return when (imageType) {
             ImageType.LOGO -> {
                 if (seriesId != null && (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)) {
-                    getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else {
-                    getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 }
             }
 
             ImageType.BACKDROP -> {
                 if (seriesId != null && (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)) {
-                    getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (backdropTags.isNotEmpty()) {
-                    getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else {
                     null
                 }
@@ -51,24 +52,24 @@ class ImageUrlService(
                 if (useSeriesForPrimary && parentThumbId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(parentThumbId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (useSeriesForPrimary && parentBackdropId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(parentBackdropId, ImageType.BACKDROP, fillWidth, fillHeight)
+                    getItemImageUrl(parentBackdropId, ImageType.BACKDROP, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (parentThumbId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
-                    getItemImageUrl(parentThumbId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(parentThumbId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (useSeriesForPrimary &&
                     parentThumbId == null &&
                     itemType == BaseItemKind.EPISODE &&
                     imageTags[imageType] == null
                 ) {
                     // Fall back to episode image if no parent thumb
-                    getItemImageUrl(itemId, ImageType.PRIMARY, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, ImageType.PRIMARY, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (imageTags[imageType] == null && backdropTags.isNotEmpty()) {
-                    getItemImageUrl(itemId, ImageType.BACKDROP, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, ImageType.BACKDROP, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else {
-                    getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 }
             }
 
@@ -78,16 +79,17 @@ class ImageUrlService(
                 if (useSeriesForPrimary && seriesId != null &&
                     (itemType == BaseItemKind.EPISODE || itemType == BaseItemKind.SEASON)
                 ) {
-                    getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else if (seriesId != null && itemType == BaseItemKind.SEASON && imageTags[imageType] == null) {
-                    getItemImageUrl(seriesId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(seriesId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 } else {
-                    getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
+                    getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
                 }
             }
 
-            else -> getItemImageUrl(itemId, imageType, fillWidth, fillHeight)
+            else -> getItemImageUrl(itemId, imageType, fillWidth = fillWidth, fillHeight = fillHeight, tag = selectedTag)
         }
+    }
 
     fun getItemImageUrl(
         item: BaseItem?,
@@ -158,7 +160,10 @@ class ImageUrlService(
         )
     }
 
-    fun getUserImageUrl(userId: UUID) = api.imageApi.getUserImageUrl(userId)
+    fun getUserImageUrl(userId: UUID): String? {
+        if (api.baseUrl.isNullOrBlank()) return null
+        return api.imageApi.getUserImageUrl(userId)
+    }
 
     companion object {
         private const val QUALITY = 96

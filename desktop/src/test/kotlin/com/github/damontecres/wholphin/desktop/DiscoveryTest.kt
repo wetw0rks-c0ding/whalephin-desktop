@@ -7,6 +7,8 @@ import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.DeviceInfo
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.Duration
+import kotlin.time.toKotlinDuration
 
 /**
  * Exercises the app's real server-discovery path (the same code `addServer`
@@ -14,7 +16,9 @@ import org.junit.jupiter.api.Test
  */
 class DiscoveryTest {
     @Test
-    fun `discovers a real public server when given its full base URL`() = runBlocking {
+    fun `discovers a real public server when given its full base URL`() = runBlocking(
+        timeout = Duration.ofSeconds(30).toKotlinDuration(),
+    ) {
         val factory =
             JellyfinClientFactory(
                 ClientInfo("Wholphin Test", "0.0.0-test"),
