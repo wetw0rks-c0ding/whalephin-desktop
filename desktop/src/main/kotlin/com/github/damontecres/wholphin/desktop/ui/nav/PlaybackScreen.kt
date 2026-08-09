@@ -31,8 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.playback.PlaybackState
@@ -63,7 +69,7 @@ fun PlaybackScreen(
         onDispose { engine.stop() }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = modifier.fillMaxSize().background(Color.Black).playbackKeyHandler(engine)) {
         // Transport controls overlay at bottom
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
@@ -126,3 +132,18 @@ private fun formatTime(ms: Long): String {
         "%d:%02d".format(minutes, seconds % 60)
     }
 }
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.playbackKeyHandler(engine: MpvEngine): Modifier =
+    this.onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+        when (event.key) {
+            Key.Spacebar -> { engine.togglePlayPause(); true }
+            Key.DirectionLeft -> { engine.seekRelative(-5_000); true }
+            Key.DirectionRight -> { engine.seekRelative(5_000); true }
+            Key.DirectionUp -> { engine.setVolume((engine.info.value.volume + 5).coerceAtMost(100)); true }
+            Key.DirectionDown -> { engine.setVolume((engine.info.value.volume - 5).coerceAtLeast(0)); true }
+            Key.F -> { engine.togglePlayPause(); true } // fallback
+            else -> false
+        }
+    }

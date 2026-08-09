@@ -56,5 +56,16 @@ tasks.test {
 compose.desktop {
     application {
         mainClass = "com.github.damontecres.wholphin.desktop.MainKt"
+
+        nativeDistributions {
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage)
+            packageName = "whalephin"
+            packageVersion = "1.0.0"
+            description = "Jellyfin media client for Linux"
+            vendor = "Whalephin Desktop"
+            linux {
+                iconFile.set(project.file("src/main/resources/icon.png"))
+            }
+        }
     }
 }

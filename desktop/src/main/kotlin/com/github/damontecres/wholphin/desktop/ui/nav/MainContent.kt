@@ -25,7 +25,9 @@ import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.Library
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
+import com.github.damontecres.wholphin.desktop.ui.KeyShortcuts
 import com.github.damontecres.wholphin.desktop.ui.components.LocalImageUrlService
+import com.github.damontecres.wholphin.desktop.ui.globalKeyHandler
 import com.github.damontecres.wholphin.desktop.util.launchDefault
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.util.Log
@@ -84,8 +86,22 @@ fun MainContent(
     }
 
     val isFullScreen = currentDestination?.fullScreen == true
+    val isPlayback = currentDestination is Destination.Playback
     CompositionLocalProvider(LocalImageUrlService provides imageUrlService) {
-        Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            modifier = modifier
+                .fillMaxSize()
+                .globalKeyHandler(
+                    onBack = { navigationManager.goBack() },
+                    onHome = { navigationManager.goToHome() },
+                    onSearch = { navigationManager.navigateToFromDrawer(Destination.Search()) },
+                    isPlaybackActive = isPlayback,
+                    onPlayPause = { /* handled in PlaybackScreen via mpv engine directly */ },
+                    onSeekBackward = { /* handled in PlaybackScreen */ },
+                    onSeekForward = { /* handled in PlaybackScreen */ },
+                ),
+            color = MaterialTheme.colorScheme.background,
+        ) {
             if (isFullScreen) {
                 DestinationContent(
                     destination = navigationManager.backStack.last(),

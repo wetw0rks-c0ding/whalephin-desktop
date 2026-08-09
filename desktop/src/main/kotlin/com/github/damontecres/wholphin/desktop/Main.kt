@@ -7,6 +7,7 @@ import com.github.damontecres.wholphin.desktop.ui.WholphinApp
 import org.koin.core.context.startKoin
 
 fun main() {
+    CrashHandler.install()
     startKoin {
         modules(desktopModule)
     }
