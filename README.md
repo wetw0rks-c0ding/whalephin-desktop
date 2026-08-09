@@ -1,142 +1,109 @@
-# Wholphin - an OSS Android TV client for Jellyfin
+# Whalephin Desktop
 
-> "Never half-phin two jellies. Always wholphin one jelly."
+A native Linux desktop port of [Wholphin](https://github.com/damontecres/Wholphin) — an open-source Jellyfin client — built with **Compose Multiplatform** and **MPV** (libmpv).
 
-Wholphin is an open-source Android TV client for Jellyfin. It aims to provide a different app UI that's inspired by Plex for users interested in migrating to Jellyfin.
+## Architecture
 
-This is not a fork of the [official client](https://github.com/jellyfin/jellyfin-androidtv). Wholphin's user interface and controls have been written completely from scratch. Wholphin supports playing media using either ExoPlayer or MPV.
+```
+whalephin/
+├── app/             # Upstream Android app — unchanged, keeps building
+├── core/            # JVM library — Android-free shared logic (models, services, API)
+├── desktop/         # Compose Desktop app (JVM)
+└── gradle/          # Shared version catalog + wrapper
+```
 
-<p align="center">
-<a href="https://github.com/damontecres/Wholphin/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/damontecres/wholphin.svg"/>
-</a>
-<a href="https://translate.codeberg.org/engage/wholphin/">
-<img src="https://translate.codeberg.org/widget/wholphin/wholphin/svg-badge.svg" alt="Translation status" />
-</a>
-<br/>
-<a href="https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin">
-<img width="180" alt="Get Wholphin on Google Play" src="https://github.com/user-attachments/assets/2550a4cb-ce46-47a1-ae24-f33a169234b7"/>
-</a>
-<a href="https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin">
-<img width="180" alt="Get Wholphin on Amazon AppStore" src="https://github.com/user-attachments/assets/1f3a3b26-4b4f-44b1-9741-f4c895c8a53b"/>
-</a>
+The `core` module extracts all portable Kotlin from the Android app (models, repositories, services, filters) into a plain JVM library. The `desktop` module reimplements the UI in JetBrains Compose Material3. The original Android `app` module is preserved intact and shares the `core` library — no code duplication, no drift.
 
+**Key technology swaps:**
 
-</p>
-
-![v0_5_1_home](https://github.com/user-attachments/assets/62bb1703-abdf-4154-9054-e00b6ceb57b5)
+| Android | Desktop |
+|---------|---------|
+| Hilt (DI) | Koin |
+| Room (DB) | JSON file persistence |
+| WorkManager | Coroutine-based scheduler |
+| ExoPlayer / MPV (AAR) | libmpv via Unix socket IPC |
+| androidx.tv.* | Compose Material3 |
+| Navigation3 (Android) | State-based navigation |
+| DataStore | File-backed preferences |
 
 ## Features
 
-### User interface
+### Browse & Discover
+- Home screen with customizable rows (Continue Watching, Next Up, pinned libraries)
+- Library grids with sort/filter
+- Item detail pages — movie, series, season, episode, person
+- Search with filter support
+- Coil 3 image loading with crossfade
 
-- Customize the home page to see the content you are interested in
-    - Use poster or thumb images, show/hide titles, add/remove/re-order different types of rows!
-    - Option to combine the Continue Watching & Next Up into a single row
-    - Pin collections, playlists, favorites, genres, and studios
-    - Remove series from next up
-- A navigation drawer for quick access to libraries, favorites, search, and settings from almost anywhere in the app
-- Integration with [Seerr](https://github.com/seerr-team/seerr) to discover new movies and TV shows
-    - Note: only available when installed from [GitHub](https://github.com/damontecres/Wholphin/releases/latest) or the [Play store](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin)
-- Customize library display
-  - Option to show Movie/TV Show titles
-  - Choose image types & size
-  - Choose from grid or list layouts
-- Play theme music, if available
-- Customize subtitle style for plain text subtitles with separate HDR settings
-- Search & download subtitles (requires compatible server plugin such as [OpenSubtitles](https://github.com/jellyfin/jellyfin-plugin-opensubtitles))
-- Multiple app color themes
-- Protect user profile switches with PIN code or require server login
-- Change the user interface language per user
-- In-app & Android OS screensaver support
+### Playback (MPV via libmpv)
+- Direct-play negotiation via device profile
+- Seek, pause, volume control
+- Subtitle track selection + download
+- Audio track selection
+- Chapter markers
+- Next-up auto-play
+- Resume position tracking
+- Playback effects (intro skip, etc.)
+- Cinema mode / preroll support
 
-### Playback
+### Settings
+- Server setup with Quick Connect + user/password auth
+- PIN-locked user switching (PBKDF2WithHmacSHA256)
+- Multiple servers + user profiles
+- Theme selection
+- Home screen customization
+- Subtitle styling
+- Language preferences
+- Screensaver preferences
 
-- Different media playback engines:
-  - **ExoPlayer** w/ optional extra audio, SSA/ASS, & AV1 software decoding
-  - **MPV** for direct playing anything with great SSA/ASS subtitle support
-- Plex inspired playback controls:
-  - Using D-Pad left/right for seeking during playback
-  - Quickly access video chapters & queue during playback
-  - Optionally skip back a few seconds when resuming playback
-- Live TV & DVR support
-- Music & music video support
-- Cinema mode/pre-roll intro support (requires compatible server plugin such as [Intros](https://github.com/jellyfin/jellyfin-plugin-intros))
-- Auto play next episodes with pass out protection
-- Option for automatic refresh rate & resolution switching on supported displays
-- Trickplay (video preview) support
-- Subtly show playback position along the bottom of the screen while seeking w/ D-Pad
+### Media Features
+- Favorites management
+- Trailers (YouTube integration)
+- Extras and special features
+- Playlists
+- Seerr integration (discover + request)
+- Live TV guide (programguide)
 
-### Roadmap
+### System
+- Background task scheduling (suggestions refresh, next-up scan, date-played report)
+- XDG base directory compliance (`~/.config/wholphin`, `~/.local/share/wholphin`)
+- Secure file permissions (0600) on credential files
+- Atomic file writes with backup recovery
 
-See [here for the roadmap](https://github.com/damontecres/Wholphin/wiki#roadmap)
+## Build & Run
 
-## Installation
+**Prerequisites:** JDK 17+ and libmpv (`mpv` package on most distros).
 
-Using [Google Play](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin) or [Amazon appstore](https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin) are the fastest way to install. But you can follow these instructions to install without needing an app store
+```bash
+git clone https://github.com/wetw0rks-c0ding/whalephin-desktop
+cd whalephin-desktop
+./gradlew :desktop:run
+```
 
-Downloader Code: `8668671`
+The Android `app` module requires the Android SDK. Desktop-only builds skip it:
 
-1. Enable side-loading "unknown" apps
-    - https://androidtvnews.com/unknown-sources-chromecast-google-tv/
-    - https://www.xda-developers.com/how-to-sideload-apps-android-tv/
-    - https://developer.android.com/distribute/marketing-tools/alternative-distribution#unknown-sources
-    - https://www.aftvnews.com/how-to-enable-apps-from-unknown-sources-on-an-amazon-fire-tv-or-fire-tv-stick/
-2. Install the APK on your Android TV device with one of these options:
-    - Install a browser program such as [Downloader](https://www.aftvnews.com/downloader/), use it to get the latest apk with short code `8668671` or URL: http://aftv.news/8668671
-    - Download the latest APK release from the [releases page](https://github.com/damontecres/Wholphin/releases/latest) or http://aftv.news/8668671
-        - Put the APK on an SD Card/USB stick/network share and use a file manager app from the Google Play Store / Amazon AppStore (e.g. `FX File Explorer`). Android's preinstalled file manager probably will not work!
-        - Use `Send files to TV` from the Google Play Store on your phone & TV
-        - (Expert) Use [ADB](https://developer.android.com/studio/command-line/adb) to install the APK from your computer ([guide](https://fossbytes.com/side-load-apps-android-tv/#h-how-to-sideload-apps-on-your-android-tv-using-adb))
+```bash
+./gradlew :core:test :desktop:compileKotlin
+```
 
-### Upgrading the app
+## Progress
 
-After the initial install above, the app will automatically check for updates. The updates can be installed in settings.
+| Milestone | Status |
+|-----------|--------|
+| M0 — Clone & validate | Done |
+| M1 — Skeleton (modules, Compose window, Koin) | Done |
+| M2 — Server connect, auth, persistence | Done |
+| M3 — Browse (home, libraries, detail, search) | Done |
+| M4 — Playback (MPV, controls, tracks, next-up) | Done |
+| M5 — Settings parity | Done |
+| M6 — Media features (favorites, trailers, extras, playlists, Seerr) | Done |
+| M7 — Background services (coroutine scheduler) | Done |
+| M8 — Parity hardening, keyboard shortcuts, AppImage packaging | In progress |
 
-The first time you attempt an update, the OS should guide you through enabling the required additional permissions for the app to install updates.
+## License
 
-Note: if installed via an app store, the app store will handle updates.
+GPL-2.0 — same as the upstream Wholphin project.
 
-## Compatibility
+## Acknowledgments
 
-Requires Android 6+ (or Fire TV OS 6+) and Jellyfin server `10.10.x` or `10.11.x` (tested on primarily `10.11`).
-
-The app is tested on a variety of Android TV/Fire TV OS devices, but if you encounter issues, please file an issue!
-
-Seerr integration is tested with `v3.3.0`. Older versions may not work.
-
-## Contributions
-
-Issues and pull requests are always welcome! Please check before submitting that your issue or pull request is not a duplicate.
-
-If you plan to contribute, please read the [contributing guide](CONTRIBUTING.md)!
-
-You can [help translate Wholphin](https://translate.codeberg.org/engage/wholphin/)!
-
-## Acknowledgements
-
-- Thanks to the Jellyfin team for creating and maintaining such a great open-source media server
-- Thanks to the official Jellyfin Android TV client developers, some code for creating the device direct play profile is adapted from there
-- Thanks to the Jellyfin Kotlin SDK developers for making it easier to interact with the Jellyfin server API
-- Thanks to numerous other libraries that make app development even possible
-
-## Additional screenshots
-
-### Customized home page
-![customize_home_example](https://github.com/user-attachments/assets/9a4f04b7-9604-4ea7-b352-50f2b15dc2f1)
-
-### Movie library browsing
-![v0_5_1_library](https://github.com/user-attachments/assets/fad0424b-0631-4438-a8bc-d4fbb95a5bf3)
-
-### Movie page
-![v0_5_1_movie](https://github.com/user-attachments/assets/849aad34-49d5-4864-8de7-005bbcb68ac6)
-
-### Series page
-![v0_5_1_series](https://github.com/user-attachments/assets/655389e1-6a6f-43bc-85e1-e2feffb20429)
-
-### Genres in library
-![v0_5_1_genres](https://github.com/user-attachments/assets/5bbcbeb6-edc9-42c7-a1d8-d92fa432a498)
-
-
-### Playlist
-![v0_5_1_playlist](https://github.com/user-attachments/assets/98268f7d-479d-41c6-b47b-3e67bbe661bc)
+This is a fork of [damontecres/Wholphin](https://github.com/damontecres/Wholphin), an excellent open-source Jellyfin client for Android TV. Thanks to the Jellyfin team for creating and maintaining the media server, and to the Jellyfin Kotlin SDK developers.
