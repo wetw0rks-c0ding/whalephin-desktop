@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
-import com.github.damontecres.wholphin.desktop.ui.components.MediaRow
 import com.github.damontecres.wholphin.util.DataLoadingState
 import org.jellyfin.sdk.api.client.ApiClient
 import org.koin.compose.koinInject
@@ -85,15 +84,27 @@ fun SearchPage(
 
                         is DataLoadingState.Success -> {
                             if (result.data.isNotEmpty()) {
-                                MediaRow(
-                                    title = type.label,
-                                    items = result.data,
-                                    viewOptions = HomeRowViewOptions(),
-                                    showViewMore = false,
-                                    onItemClick = onItemClick,
-                                    onViewMore = null,
+                                Column(
                                     modifier = Modifier.padding(bottom = 24.dp),
-                                )
+                                ) {
+                                    Text(
+                                        text = type.label,
+                                        style = MaterialTheme.typography.titleLarge,
+                                    )
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        items(result.data.size) { index ->
+                                            Text(
+                                                text = result.data[index]?.name ?: "Item $index",
+                                                modifier = Modifier.padding(8.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             }
                         }
                     }

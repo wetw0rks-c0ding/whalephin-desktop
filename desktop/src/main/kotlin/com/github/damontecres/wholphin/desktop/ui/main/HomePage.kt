@@ -27,7 +27,6 @@ import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
-import com.github.damontecres.wholphin.desktop.ui.components.MediaRow
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import org.koin.compose.koinInject
 
@@ -110,15 +109,36 @@ private fun HomeRowContent(
     when (row) {
         is HomeRowLoadingState.Pending,
         is HomeRowLoadingState.Loading,
-        -> MediaRow(title = row.title, items = emptyList(), viewOptions = com.github.damontecres.wholphin.data.model.HomeRowViewOptions(), showViewMore = false, onItemClick = {}, onViewMore = null)
+        -> Column(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = row.title,
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
 
         is HomeRowLoadingState.Success ->
-            MediaRow(
-                title = row.title,
-                items = row.items,
-                viewOptions = row.viewOptions,
-                showViewMore = row.showViewMore,
-                onItemClick = onItemClick,
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = row.title,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(row.items.size) { index ->
+                        Text(
+                            text = row.items[index]?.name ?: "Item $index",
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                }
+            }
                 onViewMore = row.rowType?.let { { onViewMore(it, row.title) } },
             )
 

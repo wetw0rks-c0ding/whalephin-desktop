@@ -34,7 +34,6 @@ import com.github.damontecres.wholphin.data.model.CollectionFolderFilter
 import com.github.damontecres.wholphin.data.SortAndDirection
 import com.github.damontecres.wholphin.data.ViewOptions
 import com.github.damontecres.wholphin.desktop.data.LibraryDisplayInfoStore
-import com.github.damontecres.wholphin.desktop.ui.components.MediaGrid
 import com.github.damontecres.wholphin.util.LoadingState
 import java.util.UUID
 import org.jellyfin.sdk.api.client.ApiClient
@@ -87,12 +86,18 @@ fun CollectionFolderScreen(
                 }
 
             LoadingState.Success ->
-                MediaGrid(
-                    items = state.items,
-                    viewOptions = state.viewOptions,
-                    onItemClick = onItemClick,
+                LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.items.size) { index ->
+                        Text(
+                            text = "Item $index",
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                }
         }
     }
 }

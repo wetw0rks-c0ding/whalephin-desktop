@@ -140,11 +140,18 @@ private fun MoreHomeRowContent(
             Text(loading.localizedMessage, modifier = Modifier.padding(48.dp))
 
         com.github.damontecres.wholphin.util.LoadingState.Success ->
-            com.github.damontecres.wholphin.desktop.ui.components.MediaGrid(
-                items = state.items,
-                viewOptions = com.github.damontecres.wholphin.data.ViewOptions(),
-                onItemClick = onItemClick,
-            )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(state.items.size) { index ->
+                    Text(
+                        text = "Item $index",
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+            }
     }
 }
 

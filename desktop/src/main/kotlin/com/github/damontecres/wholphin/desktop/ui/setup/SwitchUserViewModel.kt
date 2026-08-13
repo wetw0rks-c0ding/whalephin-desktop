@@ -146,8 +146,12 @@ class SwitchUserViewModel(
                 setupNavigationManager.navigateTo(SetupDestination.AppContent(current))
             } catch (ex: Exception) {
                 Log.e(ex, "Error logging in user")
-                if (ex is InvalidStatusException && ex.status == 401) {
-                    _state.update { it.copy(switchUserState = LoadingState.Error("Invalid username or password")) }
+                if (ex is InvalidStatusException) {
+                    when (ex.status) {
+                        401 -> _state.update { it.copy(switchUserState = LoadingState.Error("Invalid username or password")) }
+                        400 -> _state.update { it.copy(switchUserState = LoadingState.Error("Authentication failed. Please check your credentials and server URL.")) }
+                        else -> _state.update { it.copy(switchUserState = LoadingState.Error("Server error: ${ex.message}")) }
+                    }
                 } else {
                     setError("Error during login", ex)
                 }
