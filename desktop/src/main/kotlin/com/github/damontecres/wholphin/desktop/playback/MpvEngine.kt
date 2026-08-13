@@ -32,6 +32,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class MpvEngine(
     private val engineScope: CoroutineScope,
+    val serverUrl: String = "",
 ) : PlaybackEngine {
 
     private val _info = MutableStateFlow(PlaybackInfo())

@@ -137,10 +137,11 @@ private fun HomeRowContent(
                             modifier = Modifier.padding(8.dp),
                         )
                     }
+                    if (row.rowType != null) {
+                        onViewMore(row.rowType, row.title)
+                    }
                 }
             }
-                onViewMore = row.rowType?.let { { onViewMore(it, row.title) } },
-            )
 
         is HomeRowLoadingState.Error ->
             Text(

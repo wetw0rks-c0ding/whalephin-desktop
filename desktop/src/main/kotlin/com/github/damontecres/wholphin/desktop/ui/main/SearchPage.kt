@@ -105,7 +105,6 @@ fun SearchPage(
                                     }
                                 }
                             }
-                            }
                         }
                     }
                 }

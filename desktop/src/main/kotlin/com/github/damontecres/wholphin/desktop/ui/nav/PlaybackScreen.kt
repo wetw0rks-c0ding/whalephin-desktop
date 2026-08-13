@@ -62,7 +62,10 @@ fun PlaybackScreen(
     var dragPos by remember(itemId, type) { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(engine, itemId, type, initialPositionMs) {
-        engine.play("", initialPositionMs)
+        // Build Jellyfin media URL from server + item info
+        val serverUrl = engine.serverUrl ?: return@LaunchedEffect
+        val mediaUrl = buildMediaUrl(serverUrl, itemId, type)
+        engine.play(mediaUrl, initialPositionMs)
     }
 
     DisposableEffect(engine) {
