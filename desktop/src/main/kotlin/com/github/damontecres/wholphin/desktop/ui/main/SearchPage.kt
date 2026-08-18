@@ -3,7 +3,6 @@ package com.github.damontecres.wholphin.desktop.ui.main
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,14 +92,14 @@ fun SearchPage(
                                         text = type.label,
                                         style = MaterialTheme.typography.titleLarge,
                                     )
-                                    LazyColumn(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        items(result.data.size) { index ->
+                                        result.data.forEachIndexed { index, item ->
                                             Text(
-                                                text = result.data[index]?.name ?: "Item $index",
+                                                text = item?.name ?: "Item $index",
                                                 modifier = Modifier.padding(8.dp),
                                             )
                                         }

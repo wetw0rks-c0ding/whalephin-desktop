@@ -1,10 +1,11 @@
 package com.github.damontecres.wholphin.desktop.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -124,24 +125,35 @@ private fun HomeRowContent(
             Column(
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    text = row.title,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    items(row.items.size) { index ->
-                        Text(
-                            text = row.items[index]?.name ?: "Item $index",
-                            modifier = Modifier.padding(8.dp),
-                        )
-                    }
+                    Text(
+                        text = row.title,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                     val rowType = row.rowType
                     if (rowType != null) {
-                        onViewMore(rowType, row.title)
+                        Text(
+                            text = "View More",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { onViewMore(rowType, row.title) },
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    row.items.forEachIndexed { index, item ->
+                        Text(
+                            text = item?.name ?: "Item $index",
+                            modifier = Modifier.padding(8.dp),
+                        )
                     }
                 }
             }
