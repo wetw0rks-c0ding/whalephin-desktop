@@ -98,10 +98,12 @@ class ServerRepository(
                 throw IllegalStateException("User is not part of the server")
             }
             Log.v("Changing user to ${user.id} on server ${server.id}")
+            Log.d("changeUser: before update — api.baseUrl='${apiClient.baseUrl}'")
             // Save previous client state in case validation fails
             val previousBaseUrl = apiClient.baseUrl
             val previousToken = apiClient.accessToken
             apiClient.update(baseUrl = server.url, accessToken = user.accessToken)
+            Log.d("changeUser: after update — api.baseUrl='${apiClient.baseUrl}'")
             try {
                 val userDto by apiClient.userApi.getCurrentUser()
                 val updatedServer =
@@ -152,10 +154,12 @@ class ServerRepository(
             withContext(ioDispatcher) {
                 serverDao.getServer(serverId)
             }
+        Log.d("restoreSession: serverId=$serverId userId=$userId loadedServer=${serverAndUsers?.server?.url}")
         if (serverAndUsers != null) {
             val current = _current.value
             if (current != null && current.server.id == serverId && current.user.id == userId) {
                 Log.v("Restoring session for current user, so shortcut")
+                Log.d("restoreSession shortcut: setting api.baseUrl='${current.server.url}'")
                 apiClient.update(
                     baseUrl = current.server.url,
                     accessToken = current.user.accessToken,
@@ -275,11 +279,13 @@ class ServerRepository(
     }
 
     suspend fun switchServerOrUser() {
+        Log.d("ServerRepository.switchServerOrUser() — clearing apiClient baseUrl")
         preferenceStorage.remove(CURRENT_SERVER_ID_KEY)
         preferenceStorage.remove(CURRENT_USER_ID_KEY)
         apiClient.update(baseUrl = null, accessToken = null)
         _current.value = null
         _currentUserDto.value = null
+        Log.d("ServerRepository.switchServerOrUser() done — api.baseUrl='${apiClient.baseUrl}'")
     }
 
     suspend fun updateUserAuth(

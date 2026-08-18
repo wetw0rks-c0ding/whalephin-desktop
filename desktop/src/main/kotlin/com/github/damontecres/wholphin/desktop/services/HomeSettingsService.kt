@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.desktop.services
 
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
+import com.github.damontecres.wholphin.util.Log
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
@@ -56,14 +57,20 @@ class HomeSettingsService(
     /**
      * The user's libraries (top-level user views), used by the nav drawer.
      */
-    suspend fun getLibraries(userId: UUID): List<Library> =
-        api.userViewsApi.getUserViews(userId = userId).content.items.map { view ->
+    suspend fun getLibraries(userId: UUID): List<Library> {
+        Log.d("HomeSettingsService.getLibraries() api.baseUrl='${api.baseUrl}'")
+        if (api.baseUrl.isNullOrBlank()) {
+            Log.e("HomeSettingsService: api.baseUrl is null/blank! Cannot fetch libraries.")
+            return emptyList()
+        }
+        return api.userViewsApi.getUserViews(userId = userId).content.items.map { view ->
             Library(
                 id = view.id,
                 name = view.name ?: "Library",
                 collectionType = view.collectionType,
             )
         }
+    }
 
     suspend fun fetchRow(
         userId: UUID,
