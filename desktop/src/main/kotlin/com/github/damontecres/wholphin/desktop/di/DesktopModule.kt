@@ -377,7 +377,8 @@ val desktopModule = module {
     single { HomeRowService(serverRepository = get(), homeSettingsService = get()) }
     single { MpvEngine(
         engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-        serverUrl = get<ServerRepository>().current.value?.server?.url ?: ""
+        serverUrl = get<ServerRepository>().current.value?.server?.url ?: "",
+        accessToken = get<ServerRepository>().current.value?.user?.accessToken ?: ""
     ) }
     single { ItemPlaybackStore(File(get<AppPaths>().dataDir, "item-playback.json")) }
     single { TrailerService(api = get()) }

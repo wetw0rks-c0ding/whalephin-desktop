@@ -33,6 +33,7 @@ import kotlinx.serialization.json.JsonPrimitive
 class MpvEngine(
     private val engineScope: CoroutineScope,
     val serverUrl: String = "",
+    val accessToken: String = "",
 ) : PlaybackEngine {
 
     private val _info = MutableStateFlow(PlaybackInfo())
@@ -58,14 +59,20 @@ class MpvEngine(
         val sock = File(tmpDir, "mpv.sock")
         socketFile = sock
 
+        // Append access token to URL for Jellyfin auth
+        val authUrl = if (accessToken.isNotEmpty()) {
+            "$url?api_key=$accessToken"
+        } else {
+            url
+        }
         process = ProcessBuilder(
             "mpv",
-            "--no-video", // phase 1: audio-only via IPC; full video embed comes in M4b
+            "--no-video",
             "--input-ipc-server=${sock.path}",
             "--idle=yes",
             "--force-window=no",
             "--msg-level=all=info",
-            url,
+            authUrl,
         ).redirectErrorStream(true).start()
 
         // Wait for socket to appear
