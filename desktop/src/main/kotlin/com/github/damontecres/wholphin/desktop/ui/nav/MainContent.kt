@@ -86,14 +86,8 @@ fun MainContent(
 
     val isFullScreen = currentDestination?.fullScreen == true
     val isPlayback = currentDestination is Destination.Playback
-                    isPlaybackActive = isPlayback,
-                    onPlayPause = { /* handled in PlaybackScreen via mpv engine directly */ },
-                    onSeekBackward = { /* handled in PlaybackScreen */ },
-                    onSeekForward = { /* handled in PlaybackScreen */ },
-                ),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            if (isFullScreen) {
+
+    if (isFullScreen) {
                 DestinationContent(
                     destination = navigationManager.backStack.last(),
                     onBack = { navigationManager.goBack() },
@@ -152,5 +146,3 @@ fun MainContent(
                 }
             }
         }
-    }
-}

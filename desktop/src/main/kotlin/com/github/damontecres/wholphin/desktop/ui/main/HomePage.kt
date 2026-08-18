@@ -1,8 +1,10 @@
 package com.github.damontecres.wholphin.desktop.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -137,8 +139,9 @@ private fun HomeRowContent(
                             modifier = Modifier.padding(8.dp),
                         )
                     }
-                    if (row.rowType != null) {
-                        onViewMore(row.rowType, row.title)
+                    val rowType = row.rowType
+                    if (rowType != null) {
+                        onViewMore(rowType, row.title)
                     }
                 }
             }

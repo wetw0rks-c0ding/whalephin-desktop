@@ -45,6 +45,7 @@ import com.github.damontecres.wholphin.data.playback.PlaybackState
 import com.github.damontecres.wholphin.desktop.playback.MpvEngine
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
+import java.util.UUID
 
 /**
  * Full-screen playback UI with mpv backend and transport controls.
@@ -134,6 +135,14 @@ private fun formatTime(ms: Long): String {
     } else {
         "%d:%02d".format(minutes, seconds % 60)
     }
+}
+
+// Build a Jellyfin media stream URL for mpv playback
+private fun buildMediaUrl(serverUrl: String, itemId: UUID, itemKind: BaseItemKind): String {
+    // Jellyfin API endpoint format for streaming
+    // Format: {serverUrl}/Items/{itemId}/File?features=....&enableDirectStream=true
+    // For mpv with libmpv, we typically need the direct stream URL
+    return "$serverUrl/Items/$itemId/Stream?enableDirectStream=true"
 }
 
 @OptIn(ExperimentalComposeUiApi::class)

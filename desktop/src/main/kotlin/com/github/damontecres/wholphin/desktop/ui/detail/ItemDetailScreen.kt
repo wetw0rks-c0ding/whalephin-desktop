@@ -29,7 +29,7 @@ import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.LocalTrailer
 import com.github.damontecres.wholphin.data.model.RemoteTrailer
 import com.github.damontecres.wholphin.data.model.Trailer
-import com.github.damontecres.wholphin.desktop.ui.components.LocalImageUrlService
+import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.desktop.util.DesktopViewModel
 import com.github.damontecres.wholphin.desktop.util.launchIO
 import com.github.damontecres.wholphin.services.ExtrasService
@@ -162,7 +162,7 @@ fun ItemDetailScreen(
     }
     val state by viewModel.state.collectAsState()
     LaunchedEffect(viewModel) { viewModel.init() }
-    val imageUrlService = LocalImageUrlService.current
+    val imageUrlService = koinInject<ImageUrlService>()
 
     when (val loading = state.loadingState) {
         LoadingState.Pending,
