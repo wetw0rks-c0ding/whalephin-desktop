@@ -140,10 +140,13 @@ private fun formatTime(ms: Long): String {
 
 // Build a Jellyfin media stream URL for mpv playback
 private fun buildMediaUrl(serverUrl: String, itemId: UUID, itemKind: BaseItemKind): String {
-    // Jellyfin API endpoint format for streaming
-    // Format: {serverUrl}/Items/{itemId}/File?features=....&enableDirectStream=true
-    // For mpv with libmpv, we typically need the direct stream URL
-    return "$serverUrl/Items/$itemId/Stream?enableDirectStream=true"
+    // Jellyfin API streaming endpoints:
+    //   Videos/{id}/stream — for video items
+    //   Audio/{id}/stream  — for audio items
+    // Auth is handled via mpv --http-header-fields with X-Emby-Token
+    val isAudio = itemKind == BaseItemKind.AUDIO
+    val endpoint = if (isAudio) "Audio" else "Videos"
+    return "$serverUrl/$endpoint/$itemId/stream?static=true"
 }
 
 @OptIn(ExperimentalComposeUiApi::class)

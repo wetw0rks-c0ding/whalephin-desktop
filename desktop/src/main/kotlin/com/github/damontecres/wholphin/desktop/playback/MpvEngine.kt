@@ -60,24 +60,24 @@ class MpvEngine(
         val sock = File(tmpDir, "mpv.sock")
         socketFile = sock
 
-        // Append access token to URL for Jellyfin auth
-        val authUrl = if (accessToken.isNotEmpty()) {
-            "$url?api_key=$accessToken"
-        } else {
-            url
-        }
+        // Use X-Emby-Token header for Jellyfin auth (cleaner than ?api_key=)
         process = ProcessBuilder(
-            "mpv",
-            "--no-video",
-            "--input-ipc-server=${sock.path}",
-            "--idle=yes",
-            "--force-window=no",
-            "--msg-level=all=v",
-            authUrl,
+            buildList {
+                add("mpv")
+                add("--no-video")
+                add("--input-ipc-server=${sock.path}")
+                add("--idle=yes")
+                add("--force-window=no")
+                add("--msg-level=all=v")
+                if (accessToken.isNotEmpty()) {
+                    add("--http-header-fields=X-Emby-Token: $accessToken")
+                }
+                add(url)
+            }
         ).redirectErrorStream(true).start()
 
         // Log mpv stderr to file for debugging
-        Log.d("MpvEngine: started mpv (pid=${process!!.pid()}) with url=$authUrl")
+        Log.d("MpvEngine: started mpv (pid=${process!!.pid()}) with url=$url")
         engineScope.launch(Dispatchers.IO) {
             try {
                 process!!.inputStream.bufferedReader().use { reader ->
