@@ -72,7 +72,7 @@ class MpvEngine(
             "--input-ipc-server=${sock.path}",
             "--idle=yes",
             "--force-window=no",
-            "--msg-level=all=verbose",
+            "--msg-level=all=v",
             authUrl,
         ).redirectErrorStream(true).start()
 

@@ -185,7 +185,7 @@ fun ItemDetailScreen(
                     modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 ) {
                     val backdrop =
-                        imageUrlService?.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = 1920, fillHeight = 1080)
+                        imageUrlService.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = 1920, fillHeight = 1080)
                     if (backdrop != null) {
                         Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
                             AsyncImage(
@@ -197,7 +197,7 @@ fun ItemDetailScreen(
                     }
                     Row(modifier = Modifier.padding(24.dp)) {
                         val poster =
-                            imageUrlService?.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 400, fillHeight = 600)
+                            imageUrlService.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 400, fillHeight = 600)
                         if (poster != null) {
                             AsyncImage(
                                 model = poster,
