@@ -64,7 +64,8 @@ fun PlaybackScreen(
 
     LaunchedEffect(engine, itemId, type, initialPositionMs) {
         // Build Jellyfin media URL from server + item info
-        val serverUrl = engine.serverUrl ?: return@LaunchedEffect
+        val serverUrl = engine.serverUrl
+        if (serverUrl.isBlank()) return@LaunchedEffect
         val mediaUrl = buildMediaUrl(serverUrl, itemId, type)
         engine.play(mediaUrl, initialPositionMs)
     }

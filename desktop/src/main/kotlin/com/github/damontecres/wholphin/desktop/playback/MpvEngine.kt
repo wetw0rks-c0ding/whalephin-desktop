@@ -46,6 +46,7 @@ class MpvEngine(
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun play(url: String, startPositionMs: Long) {
+        Log.d("MpvEngine.play() url='$url' startPositionMs=$startPositionMs accessToken='${accessToken.take(8)}...'")
         stopInternal()
 
         // Create an owner-only temp directory for the IPC socket
@@ -71,9 +72,34 @@ class MpvEngine(
             "--input-ipc-server=${sock.path}",
             "--idle=yes",
             "--force-window=no",
-            "--msg-level=all=info",
+            "--msg-level=all=verbose",
             authUrl,
         ).redirectErrorStream(true).start()
+
+        // Log mpv stderr to file for debugging
+        Log.d("MpvEngine: started mpv (pid=${process!!.pid()}) with url=$authUrl")
+        engineScope.launch(Dispatchers.IO) {
+            try {
+                process!!.inputStream.bufferedReader().use { reader ->
+                    val logFile = File(System.getProperty("java.io.tmpdir"), "wholphin-mpv-${process!!.pid()}.log")
+                    logFile.bufferedWriter().use { writer ->
+                        reader.forEachLine { line ->
+                            writer.write(line)
+                            writer.newLine()
+                            writer.flush()
+                            // Also echo to app log
+                            if (line.contains("error", ignoreCase = true) ||
+                                line.contains("fail", ignoreCase = true) ||
+                                line.contains(" 401", ignoreCase = true) ||
+                                line.contains(" 403", ignoreCase = true)
+                            ) {
+                                Log.e("MPV: $line")
+                            }
+                        }
+                    }
+                }
+            } catch (_: IOException) { }
+        }
 
         // Wait for socket to appear
         var attempts = 0

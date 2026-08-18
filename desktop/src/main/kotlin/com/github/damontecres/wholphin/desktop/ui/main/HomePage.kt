@@ -5,14 +5,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,14 +28,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.desktop.services.HomeSettingsService
 import com.github.damontecres.wholphin.desktop.services.NavigationManager
+import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
+import org.jellyfin.sdk.model.api.ImageType
 import org.koin.compose.koinInject
 
 @Composable
@@ -144,16 +155,20 @@ private fun HomeRowContent(
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    row.items.forEachIndexed { index, item ->
-                        Text(
-                            text = item?.name ?: "Item $index",
-                            modifier = Modifier.padding(8.dp),
-                        )
+                    items(row.items.size) { index ->
+                        val item = row.items[index]
+                        if (item != null) {
+                            MediaPosterCard(
+                                item = item,
+                                onClick = { onItemClick(item) },
+                                modifier = Modifier.width(160.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -165,5 +180,48 @@ private fun HomeRowContent(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
+    }
+}
+
+@Composable
+private fun MediaPosterCard(
+    item: BaseItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val imageUrlService = koinInject<ImageUrlService>()
+    val imageUrl = remember(item.id) {
+        imageUrlService.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 320, fillHeight = 480)
+    }
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = item.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(item.name?.take(2) ?: "?", style = MaterialTheme.typography.titleLarge)
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = item.name ?: "",
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 2,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
     }
 }

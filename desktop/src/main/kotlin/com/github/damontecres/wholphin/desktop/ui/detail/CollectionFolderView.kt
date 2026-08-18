@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.desktop.ui.detail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,8 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,9 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.data.ServerRepository
+import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.CollectionFolderFilter
 import com.github.damontecres.wholphin.data.SortAndDirection
@@ -42,6 +49,7 @@ import com.github.damontecres.wholphin.util.LoadingState
 import java.util.UUID
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.CollectionType
+import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.koin.compose.koinInject
@@ -96,12 +104,66 @@ fun CollectionFolderScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.items.size) { index ->
-                        Text(
-                            text = "Item $index",
-                            modifier = Modifier.padding(8.dp),
-                        )
+                        val item = state.items[index]
+                        if (item != null) {
+                            CollectionItemRow(
+                                item = item,
+                                onClick = { onItemClick(item) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
+        }
+    }
+}
+
+@Composable
+private fun CollectionItemRow(
+    item: BaseItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val imageUrlService = koinInject<ImageUrlService>()
+    val imageUrl = remember(item.id) {
+        imageUrlService.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 80, fillHeight = 120)
+    }
+    Row(
+        modifier = modifier.clickable(onClick = onClick).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.width(60.dp).aspectRatio(2f / 3f)) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = item.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(item.name?.take(2) ?: "?", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                text = item.name ?: "Unknown",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            item.data.productionYear?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = it.toString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
